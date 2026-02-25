@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 import sys
-sys.path.insert(0, '.')
+from pathlib import Path
+
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.meeting_skill import generate_minutes, save_meeting
 import json
 
-# 读取测试文本
-with open('test_transcription.txt', 'r', encoding='utf-8') as f:
+# 读取测试文本（相对于脚本位置）
+test_file = Path(__file__).parent / 'test_transcription.txt'
+with open(test_file, 'r', encoding='utf-8') as f:
     text = f.read()
 
 print("[STEP 1] Generating meeting minutes...")
@@ -44,9 +48,10 @@ files = save_meeting(meeting, output_dir='./output')
 print(f"JSON: {files['json']}")
 print(f"DOCX: {files['docx']}")
 
-# Save readable output
-with open('test_result.json', 'w', encoding='utf-8') as f:
+# Save readable output（相对于脚本位置）
+result_file = Path(__file__).parent / 'test_result.json'
+with open(result_file, 'w', encoding='utf-8') as f:
     json.dump(meeting.to_dict(), f, ensure_ascii=False, indent=2)
 
 print()
-print("[OK] Test completed. Check test_result.json for full output.")
+print(f"[OK] Test completed. Check {result_file} for full output.")

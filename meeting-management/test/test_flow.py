@@ -4,13 +4,17 @@
 """
 
 import sys
-sys.path.insert(0, '.')
+from pathlib import Path
+
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.meeting_skill import generate_minutes, save_meeting, update_meeting, query_meetings
 import json
 
-# 读取测试文本
-with open('test_transcription.txt', 'r', encoding='utf-8') as f:
+# 读取测试文本（相对于脚本位置）
+test_file = Path(__file__).parent / 'test_transcription.txt'
+with open(test_file, 'r', encoding='utf-8') as f:
     text = f.read()
 
 print('='*60)

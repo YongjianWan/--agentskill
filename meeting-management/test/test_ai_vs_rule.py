@@ -4,7 +4,10 @@
 import sys
 import json
 import time
-sys.path.insert(0, '.')
+from pathlib import Path
+
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.meeting_skill import generate_minutes, create_meeting_skeleton
 
@@ -140,12 +143,16 @@ def main():
         print(f"  行动项: {r['action_items_count']} (有效: {r['valid_actions']})")
         print(f"  风险点: {r['risks_count']}")
     
-    # 保存对比结果
-    with open('output/ai_vs_rule_comparison.json', 'w', encoding='utf-8') as f:
+    # 保存对比结果（相对于脚本位置）
+    test_dir = Path(__file__).parent
+    output_dir = test_dir / 'output'
+    output_dir.mkdir(exist_ok=True)
+    result_file = output_dir / 'ai_vs_rule_comparison.json'
+    with open(result_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     
     print("\n" + "="*60)
-    print("对比结果已保存到: output/ai_vs_rule_comparison.json")
+    print(f"对比结果已保存到: {result_file}")
     print("="*60)
 
 

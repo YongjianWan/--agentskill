@@ -3,7 +3,13 @@
 跑一遍完整业务流程测试
 """
 import sys
-sys.path.insert(0, 'src')
+from pathlib import Path
+
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / 'src'))
+
 from meeting_skill import generate_minutes, save_meeting, transcribe
 import json
 import os
@@ -14,8 +20,9 @@ def test_text_to_minutes():
     print("TEST 1: Text -> Minutes (Batch Mode)")
     print("=" * 60)
     
-    # 读取测试转写文本
-    with open('test_transcription.txt', 'r', encoding='utf-8') as f:
+    # 读取测试转写文本（相对于脚本位置）
+    test_file = Path(__file__).parent / 'test_transcription.txt'
+    with open(test_file, 'r', encoding='utf-8') as f:
         text = f.read()
     
     print(f"Input text length: {len(text)} chars")
