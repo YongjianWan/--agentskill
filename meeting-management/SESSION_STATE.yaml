@@ -6,7 +6,7 @@ meta:
   project: "meeting-management"
   version: "0.9-beta"
   updated: "2026-02-25"
-  session_count: 4
+  session_count: 5
 
 # === 系统状态 ===
 system:
@@ -28,10 +28,14 @@ system:
 # === 当前任务 ===
 tasks:
   active:
-    - id: "DOC-001"
-      desc: "记录未来方向（知识库打通等）"
-      status: "completed"
-      note: "docs/未来方向.md"
+    - id: "STABLE-002"
+      desc: "测试稳定化改进"
+      status: "pending"
+      subtasks:
+        - "运行单元测试验证错误处理"
+        - "测试边界情况（空文本/超长文本/磁盘满）"
+        - "验证日志输出正确"
+      deliverable: "所有边界测试通过"
 
   next:
     - id: "STABLE-001"
@@ -53,6 +57,23 @@ tasks:
       status: "parked"
 
   completed:
+    - id: "STABLE-001"
+      desc: "稳定化现有功能，修复潜在 bug"
+      done: "2026-02-25"
+      notes: |
+        完成内容:
+        1. AI 生成: 添加重试机制(3次)、可配置超时、文本截断、详细日志
+        2. WebSocket: 会话超时清理(60分钟)、消息大小限制(1MB)、详细连接日志
+        3. 日志系统: 统一日志配置(logger_config.py)、文件日志、错误分离
+        4. 边界处理: 磁盘空间检查、安全文件写入、内存检查、文本验证
+        新增文件: src/logger_config.py, src/utils.py
+      deliverable: "AI 纪要生成功能稳定可用"
+      
+    - id: "DOC-002"
+      desc: "编写服务器部署文档"
+      done: "2026-02-25"
+      notes: "DEPLOYMENT.md - 包含依赖库、部署步骤、交接清单"
+      
     - id: "CRITICAL-001"
       desc: "接入 DeepSeek AI 生成会议纪要"
       done: "2026-02-25"

@@ -1,15 +1,19 @@
 # Meeting Management Skill - Python Dependencies
-# 核心依赖 (必需)
-websockets>=12.0
-python-docx>=1.1.0
+# 更新时间: 2026-02-25
 
-# 可选: Whisper 本地转写 (离线模式)
-# faster-whisper>=1.0.0  # 推荐: CPU 更快
-# openai-whisper         # 备选
+# ============ 核心依赖 (必需) ============
+websockets>=12.0          # WebSocket 服务器
+python-docx>=1.1.0        # Word 文档生成
+requests>=2.31.0          # HTTP 请求 (AI API调用)
 
-# 可选: 性能优化 (Linux/macOS)
-# uvloop>=0.19.0
+# ============ 可选: Whisper 本地转写 (离线模式) ============
+# faster-whisper>=1.0.0   # 推荐: CPU 更快
+# openai-whisper          # 备选
 
-# 可选: 开发测试
+# ============ 可选: 性能优化 (Linux/macOS) ============
+# uvloop>=0.19.0          # 异步事件循环优化
+
+# ============ 可选: 开发测试 ============
 # pytest>=7.0.0
 # pytest-asyncio>=0.21.0
+# pyaudio>=0.2.11         # 录音功能 (Windows需: pipwin install pyaudio)
