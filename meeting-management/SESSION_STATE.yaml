@@ -1,0 +1,134 @@
+# 会话状态文件
+# AI 助手在每轮会话结束时更新此文件
+# 新会话开始时首先读取此文件
+
+meta:
+  project: "meeting-management"
+  version: "0.9-beta"
+  updated: "2026-02-25"
+  session_count: 1
+
+# === 系统状态 ===
+system:
+  phase: "pre-implementation"
+  # pre-implementation: 框架初始化、文档整理
+  # day-N: 功能开发阶段
+  # maintenance: 维护阶段
+
+  key_decisions:
+    - "AI 层与 Skill 层分离：AI 负责语义理解，Skill 负责数据/IO"
+    - "文件系统存储优先：JSON + Word 导出，数据库（v1.1）后加"
+    - "WebSocket 流式接收：适配 Handy 实时转写场景"
+    - "行动项全局台账：跨会议追踪任务状态"
+
+# === 当前任务 ===
+tasks:
+  active:
+    - id: "INIT-001"
+      desc: "按 LifeOS 协议初始化 L1 核心文档"
+      subtasks:
+        - "创建 PROJECT_CONTEXT.md"
+        - "创建 SESSION_STATE.yaml"
+        - "创建 CHANGELOG.md"
+      deliverable: "根目录存在 3 个 L1 文档，git status 显示新增"
+
+  next:
+    - id: "V1-001"
+      desc: "数据库持久化层（SQLite）"
+      subtasks:
+        - "设计 Meeting/ActionItem 表结构"
+        - "实现 SQLite 存储后端（可选切换）"
+        - "迁移现有 JSON 数据"
+        - "更新 query_meetings 支持 SQL 查询"
+      deliverable: "save_meeting() 支持 storage='sqlite' 参数"
+
+    - id: "V1-002"
+      desc: "Handy 集成验证"
+      subtasks:
+        - "测试 WebSocket 端到端流程"
+        - "验证中文路径/文件名处理"
+        - "处理并发会议场景"
+      deliverable: "Handy 转写流 → 会议纪要 Word 文档 全流程跑通"
+
+  completed:
+    - id: "V0-001"
+      desc: "核心 Skill 接口"
+      done: "2026-02-20"
+      notes: "transcribe(), create_meeting_skeleton(), save_meeting()"
+
+    - id: "V0-002"
+      desc: "Word 文档生成"
+      done: "2026-02-21"
+      notes: "python-docx 格式排版，议题/行动项表格"
+
+    - id: "V0-003"
+      desc: "WebSocket 实时流"
+      done: "2026-02-23"
+      notes: "websocket_server.py 接收 Handy 转写数据"
+
+    - id: "V0-004"
+      desc: "行动项全局台账"
+      done: "2026-02-24"
+      notes: "action_registry.json 跨会议追踪"
+
+# === 已知问题 ===
+issues:
+  open:
+    - id: "BUG-001"
+      desc: "规则引擎提取效果差（结论命中率0%，行动项噪音30%）"
+      severity: "medium"
+      workaround: "已弃用规则引擎，改由 AI 层负责语义理解"
+      notes: "_extract_topics_with_conclusion() 等函数标记弃用"
+
+    - id: "BUG-002"
+      desc: "Windows 中文路径 git add 报警告"
+      severity: "low"
+      workaround: "git add --ignore-errors"
+
+  closed: []
+
+# === 待决策项 ===
+decisions_pending:
+  - id: "DEC-001"
+    question: "数据库选型：SQLite 还是保留 JSON 为主？"
+    options:
+      - "SQLite：支持复杂查询、事务、并发"
+      - "JSON：简单、可人工查看、无需迁移"
+    context: "当前是单用户工具，JSON 够用；但未来可能有多用户/查询需求"
+
+  - id: "DEC-002"
+    question: "是否保留 _extract_topics_with_conclusion 等弃用函数？"
+    options:
+      - "保留：作为 fallback，用户可选规则引擎"
+      - "删除：代码整洁，AI 层完全接管"
+    context: "当前代码已标记弃用，但未被调用"
+
+# === 快速参考 ===
+quickref:
+  dev_spec: "docs/SKILL.md"
+  protocol: "docs/DOCUMENT_PROTOCOL.md"
+  project_context: "PROJECT_CONTEXT.md"
+  tech_stack:
+    core: "Python 3.11+"
+    transcription: "faster-whisper (small model)"
+    document: "python-docx"
+    websocket: "websockets"
+    storage: "JSON files (v0.x) / SQLite (v1.1+)"
+
+# === 首读流程 ===
+reading_order:
+  - file: PROJECT_CONTEXT.md
+    status: prerequisite
+    purpose: "项目概况（必读）"
+
+  - file: SESSION_STATE.yaml
+    status: current
+    purpose: "任务状态（本文件）"
+
+  - file: docs/SKILL.md
+    status: on_demand
+    purpose: "完整开发规格（实现时按需读对应章节）"
+
+  - file: docs/DOCUMENT_PROTOCOL.md
+    status: on_demand
+    purpose: "AI 协作规范"

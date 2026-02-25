@@ -1,0 +1,129 @@
+# ============================================
+# Agentp 平台 Skill - Git Ignore
+# ============================================
+
+# ---- 打包文件 ----
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.skill
+
+# ---- 大文件 ----
+ffmpeg.zip
+ffmpeg.exe
+*.dll
+*.so
+*.dylib
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.venv
+env/
+venv/
+ENV/
+
+# ---- Node.js ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+package-lock.json
+yarn.lock
+bun.lock
+
+# ---- Rust (Handy-source/src-tauri) ----
+target/
+Cargo.lock
+*.rs.bk
+
+# ---- IDE / 编辑器 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# ---- 输出/日志文件 ----
+output/
+logs/
+*.log
+*.tmp
+*.temp
+
+# ---- 测试/临时文件 ----
+test_*.json
+test_*.txt
+*.test
+*.bak
+*.backup
+
+# ---- Whisper 模型缓存 ----
+models/
+*.bin
+*.pt
+*.ckpt
+
+# ---- 会议管理特定 ----
+meeting-management/output/
+meeting-management/Handy-source/node_modules/
+meeting-management/Handy-source/dist/
+meeting-management/Handy-source/target/
+meeting-management/__pycache__/
+
+# ---- Handy 特定 ----
+# Handy/  # 第三方依赖，整个目录排除
+Handy/node_modules/
+Handy/dist/
+Handy/target/
+Handy/.vscode/
+
+# ---- 排除的 Skill 目录 ----
+openclaw的skill/
+
+# ---- OpenClaw ----
+openclaw的skill/__pycache__/
+openclaw的skill/*.pyc
+
+# ---- 敏感信息 ----
+*.key
+*.pem
+*.env
+config.local.*
+secrets.*

@@ -1,0 +1,53 @@
+meta:
+  project: "my-project"
+  version: "1.0-dev"
+  updated: "2026-02-22"
+  session_count: 2
+
+system:
+  phase: "day-2"
+  key_decisions:
+    - "使用 SQLite 而非 PostgreSQL：单用户工具，不需要并发，部署更简单"
+    - "CLI 框架选 Click 而非 argparse：生态好，代码更简洁"
+
+tasks:
+  active: []
+
+  next:
+    - id: "DAY2"
+      desc: "实现任务 CRUD 命令"
+      subtasks:
+        - "task add '任务名' --priority high"
+        - "task list [--status todo|done]"
+        - "task done <id>"
+        - "task delete <id>"
+      deliverable: "task add '写代码' && task list 能正常输出"
+
+  completed:
+    - id: "DAY1"
+      desc: "CLI 脚手架 + 数据库初始化"
+      done: "2026-02-21"
+      notes: "用 SQLAlchemy create_all 初始化，seed 了默认分类"
+
+issues:
+  open:
+    - id: "BUG-001"
+      desc: "Windows 上中文路径 git add 报警告"
+      severity: "low"
+      workaround: "git add --ignore-errors"
+
+decisions_pending:
+  - id: "DEC-001"
+    question: "任务优先级是否需要数字权重还是枚举（low/medium/high/urgent）？"
+    options:
+      - "枚举（简单，用户友好）"
+      - "数字权重（灵活，支持自定义排序）"
+    context: "目前 SPEC 里用枚举，但用户可能想自定义排序"
+
+quickref:
+  dev_spec: "SPEC.md"
+  protocol: "docs/DOCUMENT_PROTOCOL.md"
+  tech_stack:
+    cli: "Python 3.11 + Click"
+    db: "SQLite + SQLAlchemy"
+    testing: "pytest"

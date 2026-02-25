@@ -1,0 +1,1013 @@
+#!/usr/bin/env python3
+"""
+Meeting Management Skill - AI Callable Interface
+
+设计原则：
+- Skill 层（本模块）：负责数据层（转写、存储、I/O、格式转换）
+- AI 层（调用方）：负责智能理解（议题提取、结论识别、行动项抽取）
+
+主要接口：
+    transcribe()              - 音频转写（Skill）
+    create_meeting_skeleton() - 创建会议骨架（Skill，AI需填充内容）
+    save_meeting()            - 保存会议（Skill）
+    query_meetings()          - 查询历史（Skill）
+    update_meeting()          - 更新会议（Skill）
+
+Usage:
+    from meeting_skill import transcribe, create_meeting_skeleton, Meeting, Topic, ActionItem, save_meeting
+    
+    # Step 1: 转写（Skill）
+    result = transcribe("meeting.mp3")
+    
+    # Step 2: 创建骨架 & AI 填充（AI 层）
+    meeting = create_meeting_skeleton(result["full_text"])
+    meeting.title = "AI 识别的标题"
+    meeting.topics = [Topic(title="议题1", discussion_points=[...], conclusion="...", action_items=[...])]
+    
+    # Step 3: 保存（Skill）
+    files = save_meeting(meeting, output_dir="./output")
+
+Note:
+    generate_minutes() 已弃用，请使用 create_meeting_skeleton()
+"""
+
+import json
+import re
+import warnings
+import hashlib
+from pathlib import Path
+from datetime import datetime
+from typing import List, Optional, Dict, Any, Tuple
+from dataclasses import dataclass, field, asdict
+
+warnings.filterwarnings("ignore")
+
+
+# ============ 数据模型 ============
+
+@dataclass
+class TranscriptionSegment:
+    timestamp: str
+    speaker: str
+    text: str
+
+
+@dataclass
+class PolicyRef:
+    """政策引用（设计预留，未来功能）"""
+    policy_id: str = ""           # 政策ID
+    clause_ref: str = ""          # 引用条款
+    check_required: bool = False  # 是否待核查
+    
+    def to_dict(self) -> Dict:
+        return {
+            "policy_id": self.policy_id,
+            "clause_ref": self.clause_ref,
+            "check_required": self.check_required
+        }
+
+
+@dataclass
+class EnterpriseRef:
+    """企业关联（设计预留，未来功能）"""
+    enterprise_id: str = ""       # 企业ID
+    cooperation_item: str = ""    # 合作事项
+    contact_person: str = ""      # 对接人
+    contact_permission: str = ""  # 权限级别
+    
+    def to_dict(self) -> Dict:
+        return {
+            "enterprise_id": self.enterprise_id,
+            "cooperation_item": self.cooperation_item,
+            "contact_person": self.contact_person,
+            "contact_permission": self.contact_permission
+        }
+
+
+@dataclass
+class ProjectRef:
+    """项目关联（设计预留，未来功能）"""
+    project_id: str = ""          # 项目ID
+    milestone: str = ""           # 涉及里程碑
+    change_point: str = ""        # 变更点说明
+    
+    def to_dict(self) -> Dict:
+        return {
+            "project_id": self.project_id,
+            "milestone": self.milestone,
+            "change_point": self.change_point
+        }
+
+
+@dataclass
+class ActionItem:
+    action: str
+    owner: str
+    deadline: str
+    deliverable: str = ""
+    status: str = "待处理"
+    source_topic: str = ""
+    # 关联实体（AI 识别填充）
+    related_policy: Optional[PolicyRef] = None      # 关联政策
+    related_enterprise: Optional[EnterpriseRef] = None  # 关联企业
+    related_project: Optional[ProjectRef] = None    # 关联项目
+    
+    def to_dict(self) -> Dict:
+        return {
+            "action": self.action,
+            "owner": self.owner,
+            "deadline": self.deadline,
+            "deliverable": self.deliverable,
+            "status": self.status,
+            "source_topic": self.source_topic,
+            "related_policy": self.related_policy.to_dict() if self.related_policy else None,
+            "related_enterprise": self.related_enterprise.to_dict() if self.related_enterprise else None,
+            "related_project": self.related_project.to_dict() if self.related_project else None
+        }
+
+
+@dataclass
+class Topic:
+    title: str
+    discussion_points: List[str]
+    conclusion: str = ""  # 新增：结论
+    uncertain: List[str] = field(default_factory=list)  # 新增：不确定内容
+    action_items: List[ActionItem] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict:
+        return {
+            "title": self.title,
+            "discussion_points": self.discussion_points,
+            "conclusion": self.conclusion,
+            "uncertain": self.uncertain,
+            "action_items": [a.to_dict() for a in self.action_items]
+        }
+
+
+@dataclass
+class Meeting:
+    id: str
+    title: str
+    date: str
+    time_range: str
+    location: str
+    participants: List[str]
+    recorder: str
+    topics: List[Topic]
+    risks: List[str]
+    pending_confirmations: List[str]  # 新增：待确认事项
+    audio_path: Optional[str] = None
+    version: int = 1  # 新增：版本号
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    # === 关联实体（设计预留，AI 识别填充）===
+    # 会议涉及的政策引用
+    policy_refs: List[PolicyRef] = field(default_factory=list)
+    # 会议涉及的企业
+    enterprise_refs: List[EnterpriseRef] = field(default_factory=list)
+    # 会议关联的项目
+    project_refs: List[ProjectRef] = field(default_factory=list)
+    
+    # === 状态管理 ===
+    status: str = "draft"  # draft/final/archived
+    
+    def to_dict(self) -> Dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "date": self.date,
+            "time_range": self.time_range,
+            "location": self.location,
+            "participants": self.participants,
+            "recorder": self.recorder,
+            "topics": [t.to_dict() for t in self.topics],
+            "risks": self.risks,
+            "pending_confirmations": self.pending_confirmations,
+            "audio_path": self.audio_path,
+            "version": self.version,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            # 关联实体
+            "policy_refs": [p.to_dict() for p in self.policy_refs],
+            "enterprise_refs": [e.to_dict() for e in self.enterprise_refs],
+            "project_refs": [p.to_dict() for p in self.project_refs],
+            "status": self.status
+        }
+
+
+# ============ 核心功能 ============
+
+def transcribe(audio_path: str, model: str = "auto", language: str = "zh") -> Dict[str, Any]:
+    """
+    转写音频文件为结构化文本
+    
+    Args:
+        audio_path: 音频文件路径
+        model: 模型大小 (tiny/base/small/medium/large/auto)。默认 auto 自动选择：
+               - 会议音频自动使用 small 模型（推荐，效果更好）
+        language: 语言代码
+    
+    Returns:
+        {
+            "segments": [{"timestamp": "00:00:01", "speaker": "...", "text": "..."}],
+            "full_text": "...",
+            "participants": ["..."],
+            "duration": 1800,
+            "model_used": "small"  # 实际使用的模型
+        }
+    """
+    from faster_whisper import WhisperModel
+    
+    # 自动选择模型：会议场景默认用 small（效果更好）
+    if model == "auto":
+        # 会议场景推荐 small（244MB，中文识别效果更好）
+        model = "small"
+        print(f"[Info] 会议音频自动使用 small 模型（识别效果更好）")
+    
+    if not Path(audio_path).exists():
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    
+    model_obj = WhisperModel(model, device="cpu", compute_type="int8")
+    segments, info = model_obj.transcribe(audio_path, beam_size=5, language=language)
+    
+    result_segments = []
+    speakers = set()
+    full_text_parts = []
+    
+    for i, segment in enumerate(segments):
+        start_time = segment.start
+        text = segment.text.strip()
+        
+        hours = int(start_time // 3600)
+        minutes = int((start_time % 3600) // 60)
+        seconds = int(start_time % 60)
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        
+        # 发言人识别（简单启发式）
+        speaker = f"Speaker{i % 3 + 1}"
+        if "：" in text or ":" in text:
+            parts = text.split("：", 1) if "：" in text else text.split(":", 1)
+            if len(parts) == 2 and len(parts[0]) < 10:
+                speaker = parts[0].strip()
+                text = parts[1].strip()
+        
+        speakers.add(speaker)
+        
+        result_segments.append({
+            "timestamp": time_str,
+            "speaker": speaker,
+            "text": text
+        })
+        
+        full_text_parts.append(f"[{time_str}] {speaker}: {text}")
+    
+    return {
+        "segments": result_segments,
+        "full_text": "\n".join(full_text_parts),
+        "participants": list(speakers),
+        "duration": int(info.duration) if info.duration else 0,
+        "language": info.language,
+        "model_used": model  # 返回实际使用的模型
+    }
+
+
+def create_meeting_skeleton(
+    transcription: str,
+    meeting_id: Optional[str] = None,
+    title: str = "",
+    date: Optional[str] = None,
+    time_range: str = "",
+    location: str = "",
+    participants: Optional[List[str]] = None,
+    recorder: str = "",
+    audio_path: Optional[str] = None,
+    version: int = 1
+) -> Meeting:
+    """
+    创建会议骨架结构（基础数据层，不做智能理解）
+    
+    本函数只负责：
+    - 解析转写文本（时间戳/发言人/内容分段）
+    - 基础发言人大致识别（需 AI 校验）
+    - 创建空的 Meeting 结构供 AI 填充
+    
+    AI 需要填充：
+    - title: 会议标题（语义识别）
+    - topics: 议题列表（议题提取、结论识别、行动项抽取）
+    - risks: 风险点（语义识别）
+    - pending_confirmations: 待确认事项
+    
+    Args:
+        transcription: 转写文本（transcribe() 的 full_text 输出）
+        meeting_id: 会议ID（可选，自动生成）
+        title: 会议标题（可选，AI 应重新识别）
+        date: 日期（可选，默认今天）
+        time_range: 时间范围
+        location: 地点
+        participants: 参会人列表（可选，会从文本基础提取）
+        recorder: 记录人
+        audio_path: 音频文件路径
+        version: 版本号
+    
+    Returns:
+        Meeting 对象（topics 为空列表，需 AI 填充）
+    
+    Example:
+        >>> result = transcribe("meeting.mp3")
+        >>> meeting = create_meeting_skeleton(result["full_text"])
+        >>> # AI 填充内容
+        >>> meeting.title = "产品评审会"
+        >>> meeting.topics = [Topic(title="议题1", ...)]
+        >>> save_meeting(meeting)
+    """
+    if date is None:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    # 生成会议ID
+    if meeting_id is None:
+        meeting_id = _generate_meeting_id(date, title or "未命名会议")
+    
+    # 解析转写文本（基础清洗）
+    segments = _parse_transcription(transcription)
+    
+    # 基础参会人提取（简单启发式，AI 应校验修正）
+    detected_participants = participants or _extract_participants_basic(segments)
+    
+    # === 注意：不做智能理解，topics 留空供 AI 填充 ===
+    # 如果用户提供了 title，保留；否则设为占位符，AI 应重新识别
+    if not title:
+        title = "【AI 待识别标题】"
+    
+    # 创建空的 topics，AI 应填充
+    # 可选：将原始分段作为参考信息（非结构化）
+    raw_discussion = [seg["text"] for seg in segments[:5]] if segments else ["无内容"]
+    
+    return Meeting(
+        id=meeting_id,
+        title=title,
+        date=date,
+        time_range=time_range,
+        location=location,
+        participants=detected_participants,
+        recorder=recorder,
+        topics=[],  # ← AI 负责填充议题
+        risks=[],   # ← AI 负责识别风险
+        pending_confirmations=[],  # ← AI 负责标记待确认
+        audio_path=audio_path,
+        version=version
+    )
+
+
+def generate_minutes(
+    transcription: str,
+    meeting_id: Optional[str] = None,
+    title: str = "",
+    date: Optional[str] = None,
+    time_range: str = "",
+    location: str = "",
+    participants: Optional[List[str]] = None,
+    recorder: str = "",
+    audio_path: Optional[str] = None,
+    version: int = 1
+) -> Meeting:
+    """
+    【已弃用】请使用 create_meeting_skeleton()
+    
+    原函数尝试用规则引擎做智能提取，效果差（结论命中率0%，行动项噪音30%）。
+    根据新设计，智能理解应由 AI 完成，Skill 只提供数据骨架。
+    
+    本函数现直接代理到 create_meeting_skeleton()。
+    """
+    return create_meeting_skeleton(
+        transcription=transcription,
+        meeting_id=meeting_id,
+        title=title,
+        date=date,
+        time_range=time_range,
+        location=location,
+        participants=participants,
+        recorder=recorder,
+        audio_path=audio_path,
+        version=version
+    )
+
+
+def save_meeting(
+    meeting: Meeting,
+    output_dir: str = "./output",
+    create_version: bool = True
+) -> Dict[str, str]:
+    """
+    保存会议记录（支持版本控制）
+    
+    Args:
+        meeting: Meeting 对象
+        output_dir: 输出目录
+        create_version: 是否创建版本目录
+    
+    Returns:
+        {"docx": "...", "json": "...", "audio_backup": "..."}
+    """
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    
+    # 构建输出路径
+    if create_version:
+        meeting_dir = Path(output_dir) / "meetings" / meeting.date[:4] / meeting.date[5:7] / meeting.id
+    else:
+        meeting_dir = Path(output_dir)
+    
+    meeting_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 保存 JSON（含版本号）
+    json_path = meeting_dir / f"minutes_v{meeting.version}.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(meeting.to_dict(), f, ensure_ascii=False, indent=2)
+    
+    # 保存 Word
+    docx_path = meeting_dir / f"minutes_v{meeting.version}.docx"
+    _create_word_document(meeting, docx_path)
+    
+    # 备份录音
+    audio_backup_path = None
+    if meeting.audio_path and Path(meeting.audio_path).exists():
+        audio_name = Path(meeting.audio_path).name
+        audio_backup_path = meeting_dir / f"audio_{audio_name}"
+        import shutil
+        shutil.copy2(meeting.audio_path, audio_backup_path)
+    
+    # 更新最新版本链接
+    latest_json = meeting_dir / "minutes_latest.json"
+    latest_docx = meeting_dir / "minutes_latest.docx"
+    
+    # Windows 不支持 symlink，直接复制
+    import shutil
+    shutil.copy2(json_path, latest_json)
+    shutil.copy2(docx_path, latest_docx)
+    
+    # 保存到全局台账
+    _append_to_action_registry(meeting, output_dir)
+    
+    result = {
+        "json": str(json_path),
+        "docx": str(docx_path),
+        "meeting_dir": str(meeting_dir)
+    }
+    
+    if audio_backup_path:
+        result["audio_backup"] = str(audio_backup_path)
+    
+    return result
+
+
+def update_meeting(
+    meeting_id: str,
+    output_dir: str = "./output",
+    **updates
+) -> Meeting:
+    """
+    更新会议纪要（创建新版本）
+    
+    Args:
+        meeting_id: 会议ID
+        output_dir: 输出目录
+        **updates: 要更新的字段
+    
+    Returns:
+        新版本 Meeting 对象
+    """
+    # 查找最新版本
+    meeting_dir = _find_meeting_dir(meeting_id, output_dir)
+    if not meeting_dir:
+        raise FileNotFoundError(f"Meeting {meeting_id} not found")
+    
+    latest_json = meeting_dir / "minutes_latest.json"
+    
+    # 加载现有数据
+    with open(latest_json, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    # 创建新版本
+    new_version = data.get("version", 1) + 1
+    data["version"] = new_version
+    data["updated_at"] = datetime.now().isoformat()
+    
+    # 应用更新
+    for key, value in updates.items():
+        if key in data:
+            data[key] = value
+    
+    # 重建 Meeting 对象
+    topics = [Topic(**t) for t in data.get("topics", [])]
+    meeting = Meeting(
+        id=data["id"],
+        title=data["title"],
+        date=data["date"],
+        time_range=data.get("time_range", ""),
+        location=data.get("location", ""),
+        participants=data.get("participants", []),
+        recorder=data.get("recorder", ""),
+        topics=topics,
+        risks=data.get("risks", []),
+        pending_confirmations=data.get("pending_confirmations", []),
+        audio_path=data.get("audio_path"),
+        version=new_version,
+        created_at=data.get("created_at", datetime.now().isoformat()),
+        updated_at=data["updated_at"]
+    )
+    
+    # 保存新版本
+    save_meeting(meeting, output_dir, create_version=True)
+    
+    return meeting
+
+
+def query_meetings(
+    output_dir: str = "./output",
+    date_range: Optional[Tuple[str, str]] = None,
+    participants: Optional[List[str]] = None,
+    keywords: Optional[List[str]] = None
+) -> List[Dict]:
+    """
+    查询历史会议
+    
+    Args:
+        output_dir: 输出目录
+        date_range: (开始日期, 结束日期) 格式 YYYY-MM-DD
+        participants: 参会人列表
+        keywords: 关键词列表
+    
+    Returns:
+        Meeting 列表
+    """
+    meetings_dir = Path(output_dir) / "meetings"
+    results = []
+    
+    if not meetings_dir.exists():
+        return results
+    
+    # 遍历所有会议目录
+    for year_dir in meetings_dir.iterdir():
+        if not year_dir.is_dir():
+            continue
+        for month_dir in year_dir.iterdir():
+            if not month_dir.is_dir():
+                continue
+            for meeting_dir in month_dir.iterdir():
+                if not meeting_dir.is_dir():
+                    continue
+                
+                latest_json = meeting_dir / "minutes_latest.json"
+                if not latest_json.exists():
+                    continue
+                
+                try:
+                    with open(latest_json, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    
+                    # 过滤条件
+                    if date_range:
+                        if not (date_range[0] <= data.get("date", "") <= date_range[1]):
+                            continue
+                    
+                    if participants:
+                        if not any(p in data.get("participants", []) for p in participants):
+                            continue
+                    
+                    if keywords:
+                        text = json.dumps(data, ensure_ascii=False)
+                        if not any(kw in text for kw in keywords):
+                            continue
+                    
+                    results.append(data)
+                except Exception:
+                    continue
+    
+    # 按日期排序
+    results.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return results
+
+
+# ============ 内部辅助函数 ============
+
+def _generate_meeting_id(date: str, title: str) -> str:
+    """生成会议ID"""
+    timestamp = datetime.now().strftime("%H%M%S")
+    hash_input = f"{date}_{title}_{timestamp}"
+    hash_suffix = hashlib.md5(hash_input.encode()).hexdigest()[:6]
+    return f"M{date.replace('-', '')}_{timestamp}_{hash_suffix}"
+
+
+def _parse_transcription(text: str) -> List[Dict[str, str]]:
+    """解析转写文本为段落列表"""
+    segments = []
+    lines = text.strip().split("\n")
+    pattern = r"\[(\d{2}:\d{2}:\d{2})\]\s*([^：:]+)[：:](.+)"
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        match = re.match(pattern, line)
+        if match:
+            segments.append({
+                "time": match.group(1),
+                "speaker": match.group(2).strip(),
+                "text": match.group(3).strip()
+            })
+        else:
+            segments.append({"time": "", "speaker": "", "text": line})
+    
+    return segments
+
+
+def _extract_topics_with_conclusion(segments: List[Dict]) -> List[Topic]:
+    """
+    【已弃用】规则引擎议题提取效果差（结论命中率0%，行动项噪音30%）
+    
+    议题提取、结论识别、行动项抽取应由 AI 完成。
+    本函数保留仅供参考，不建议使用。
+    """
+    if not segments:
+        return [Topic(title="无内容", discussion_points=["未识别到有效内容"])]
+    
+    # 简单策略：按发言人变化或关键词分议题
+    topics = []
+    current_discussion = []
+    
+    # 不确定关键词
+    uncertain_keywords = ["可能", "大概", "也许", "待定", "待确认", "不确定", "暂时", "暂定", "估计"]
+    
+    # 结论关键词
+    conclusion_keywords = ["结论", "决定", "确定", "一致同意", "决议", "定下"]
+    
+    for seg in segments:
+        text = seg["text"]
+        
+        # 检查是否是新议题的开始（简单启发式）
+        is_new_topic = any(kw in text[:10] for kw in ["首先", "第一", "第二", "第三", "关于", "接下来"])
+        
+        if is_new_topic and current_discussion:
+            # 保存当前议题
+            topic = _create_topic_from_discussion(current_discussion, uncertain_keywords, conclusion_keywords)
+            topics.append(topic)
+            current_discussion = []
+        
+        current_discussion.append(seg)
+    
+    # 保存最后一个议题
+    if current_discussion:
+        topic = _create_topic_from_discussion(current_discussion, uncertain_keywords, conclusion_keywords)
+        topics.append(topic)
+    
+    # 如果没有分议题，全部作为一个议题
+    if not topics:
+        all_texts = [s["text"] for s in segments]
+        topics = [Topic(title="主要讨论", discussion_points=all_texts)]
+    
+    return topics
+
+
+def _create_topic_from_discussion(
+    discussion: List[Dict],
+    uncertain_keywords: List[str],
+    conclusion_keywords: List[str]
+) -> Topic:
+    """【已弃用】配合 _extract_topics_with_conclusion() 使用"""
+    
+    discussion_points = []
+    uncertain = []
+    conclusion = ""
+    action_items = []
+    
+    # 提取标题（第一段）
+    title = discussion[0]["text"][:30] if discussion else "议题"
+    if len(title) > 30:
+        title = title[:30] + "..."
+    
+    for seg in discussion:
+        text = seg["text"]
+        
+        # 检查不确定内容
+        if any(kw in text for kw in uncertain_keywords):
+            uncertain.append(text)
+        
+        # 检查结论
+        if any(kw in text for kw in conclusion_keywords):
+            conclusion = text
+        
+        # 提取行动项
+        actions = _extract_actions_from_text(text, seg["speaker"])
+        action_items.extend(actions)
+        
+        discussion_points.append(text)
+    
+    return Topic(
+        title=title,
+        discussion_points=discussion_points,
+        conclusion=conclusion,
+        uncertain=uncertain,
+        action_items=action_items
+    )
+
+
+def _extract_actions_from_text(text: str, speaker: str) -> List[ActionItem]:
+    """【已弃用】规则引擎行动项提取噪音大，应由 AI 抽取"""
+    actions = []
+    action_keywords = ["负责", "完成", "准备", "确认", "提交", "制定", "跟进", "处理"]
+    
+    if any(kw in text for kw in action_keywords):
+        # 提取截止时间
+        deadline = None
+        dm = re.search(r'(\d{4})?[年/-]?(\d{1,2})[月/-](\d{1,2})日?', text)
+        if dm:
+            if dm.group(1):
+                deadline = f"{dm.group(1)}-{dm.group(2).zfill(2)}-{dm.group(3).zfill(2)}"
+            else:
+                deadline = f"{datetime.now().year}-{dm.group(2).zfill(2)}-{dm.group(3).zfill(2)}"
+        else:
+            # 相对时间
+            dm = re.search(r'(下周[一二三四五六日]|本月底|月底|下周)', text)
+            if dm:
+                deadline = dm.group(1)
+        
+        # 提取交付物（简单启发式）
+        deliverable = ""
+        if "文档" in text or "报告" in text:
+            deliverable = "文档/报告"
+        elif "代码" in text or "程序" in text:
+            deliverable = "代码"
+        elif "方案" in text:
+            deliverable = "方案"
+        
+        actions.append(ActionItem(
+            action=text[:100],
+            owner=speaker if speaker else "待定",
+            deadline=deadline if deadline else "待定",
+            deliverable=deliverable,
+            source_topic=""
+        ))
+    
+    return actions
+
+
+def _extract_risks(segments: List[Dict]) -> List[str]:
+    """【已弃用】风险识别应由 AI 完成"""
+    risks = []
+    risk_keywords = ["风险", "问题", "不稳定", "延迟", "延期", "困难", "挑战", "隐患"]
+    
+    for seg in segments:
+        text = seg["text"]
+        if any(kw in text for kw in risk_keywords):
+            risks.append(text)
+    
+    return risks
+
+
+def _extract_pending_confirmations(segments: List[Dict]) -> List[str]:
+    """【已弃用】待确认事项识别应由 AI 完成"""
+    pending = []
+    pending_keywords = ["待确认", "待定", "待明确", "待商定", "待后续"]
+    
+    for seg in segments:
+        text = seg["text"]
+        if any(kw in text for kw in pending_keywords):
+            pending.append(text)
+    
+    return list(set(pending))  # 去重
+
+
+def _extract_participants_basic(segments: List[Dict]) -> List[str]:
+    """
+    基础参会人提取（简单启发式）
+    
+    仅根据转写文本中的发言人标记提取，可能存在：
+    - 遗漏（未发言的人）
+    - 噪音（错误识别的人名）
+    - 重复（同一人多种称呼）
+    
+    AI 应结合上下文进行校验和修正。
+    """
+    speakers = set()
+    for seg in segments:
+        if seg.get("speaker"):
+            # 清理可能的噪音
+            speaker = seg["speaker"].strip()
+            if speaker and len(speaker) < 20:  # 简单长度过滤
+                speakers.add(speaker)
+    return list(speakers) or ["【AI 待识别参会人】"]
+
+
+# ============ 已弃用的智能提取函数 ============
+# 以下函数尝试用规则引擎做语义理解，效果不佳，已弃用。
+# 议题提取、结论识别、行动项抽取应由 AI 完成。
+
+def _extract_participants(segments: List[Dict]) -> List[str]:
+    """【已弃用】使用 _extract_participants_basic()"""
+    return _extract_participants_basic(segments)
+
+
+def _extract_title(first_text: str) -> str:
+    """【已弃用】会议标题识别应由 AI 完成"""
+    # 常见会议开场白模式
+    patterns = [
+        r'(.{2,20})(?:会议|评审|讨论|调度|协调|例会)',
+        r'(?:关于|就)(.{2,20})(?:的|进行)(?:讨论|评审|会议)',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, first_text)
+        if match:
+            return match.group(0)
+    
+    # 默认取前20字
+    return first_text[:20] if len(first_text) <= 20 else first_text[:20] + "..."
+
+
+def _create_word_document(meeting: Meeting, docx_path: Path):
+    """创建 Word 文档"""
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt
+    
+    doc = Document()
+    
+    # 标题
+    title = doc.add_heading(meeting.title, 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # 版本信息
+    version_para = doc.add_paragraph()
+    version_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    version_run = version_para.add_run(f"版本: v{meeting.version}")
+    version_run.font.size = Pt(9)
+    version_run.font.color.rgb = None  # 灰色
+    
+    # 基本信息
+    doc.add_heading("一、会议基本信息", level=1)
+    info = doc.add_paragraph()
+    info.add_run(f"会议主题：{meeting.title}\n")
+    info.add_run(f"会议时间：{meeting.date} {meeting.time_range}\n")
+    info.add_run(f"会议地点：{meeting.location or '待定'}\n")
+    info.add_run(f"参会人员：{'、'.join(meeting.participants)}\n")
+    info.add_run(f"记录人员：{meeting.recorder or '待定'}\n")
+    
+    # 议题
+    doc.add_heading("二、议题与讨论", level=1)
+    
+    for i, topic in enumerate(meeting.topics, 1):
+        doc.add_heading(f"议题{i}：{topic.title}", level=2)
+        
+        # 讨论要点
+        if topic.discussion_points:
+            doc.add_heading("（一）讨论要点", level=3)
+            for point in topic.discussion_points[:5]:
+                doc.add_paragraph(point, style="List Bullet")
+        
+        # 结论
+        if topic.conclusion:
+            doc.add_heading("（二）结论", level=3)
+            doc.add_paragraph(topic.conclusion)
+        
+        # 不确定内容
+        if topic.uncertain:
+            doc.add_heading("（三）待确认事项", level=3)
+            for u in topic.uncertain:
+                p = doc.add_paragraph(style="List Bullet")
+                p.add_run(u).font.color.rgb = None  # 标红或标记
+        
+        # 行动项
+        if topic.action_items:
+            doc.add_heading("（四）行动项", level=3)
+            table = doc.add_table(rows=1, cols=5)
+            table.style = "Light List Accent 1"
+            
+            hdr_cells = table.rows[0].cells
+            hdr_cells[0].text = "行动事项"
+            hdr_cells[1].text = "负责人"
+            hdr_cells[2].text = "完成期限"
+            hdr_cells[3].text = "交付物"
+            hdr_cells[4].text = "状态"
+            
+            for action in topic.action_items:
+                row_cells = table.add_row().cells
+                row_cells[0].text = action.action[:50]
+                row_cells[1].text = action.owner
+                row_cells[2].text = action.deadline
+                row_cells[3].text = action.deliverable or "-"
+                row_cells[4].text = action.status
+    
+    # 全局待确认事项
+    if meeting.pending_confirmations:
+        doc.add_heading("三、待确认事项汇总", level=1)
+        for item in meeting.pending_confirmations:
+            doc.add_paragraph(item, style="List Bullet")
+    
+    # 风险点
+    if meeting.risks:
+        doc.add_heading("四、风险点", level=1)
+        for risk in meeting.risks:
+            doc.add_paragraph(risk, style="List Bullet")
+    
+    # 附件
+    if meeting.audio_path:
+        doc.add_heading("五、附件", level=1)
+        doc.add_paragraph(f"录音文件：{Path(meeting.audio_path).name}")
+    
+    doc.save(docx_path)
+
+
+def _find_meeting_dir(meeting_id: str, output_dir: str) -> Optional[Path]:
+    """查找会议目录"""
+    meetings_dir = Path(output_dir) / "meetings"
+    
+    if not meetings_dir.exists():
+        return None
+    
+    # 遍历查找
+    for year_dir in meetings_dir.iterdir():
+        for month_dir in year_dir.iterdir():
+            for meeting_dir in month_dir.iterdir():
+                if meeting_dir.name == meeting_id:
+                    return meeting_dir
+    
+    return None
+
+
+def _append_to_action_registry(meeting: Meeting, output_dir: str):
+    """追加行动项到全局台账"""
+    registry_path = Path(output_dir) / "action_registry.json"
+    
+    # 读取现有台账
+    registry = []
+    if registry_path.exists():
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                registry = json.load(f)
+        except:
+            registry = []
+    
+    # 添加本次行动项
+    for topic in meeting.topics:
+        for action in topic.action_items:
+            registry.append({
+                "meeting_id": meeting.id,
+                "meeting_title": meeting.title,
+                "meeting_date": meeting.date,
+                "action": action.action,
+                "owner": action.owner,
+                "deadline": action.deadline,
+                "deliverable": action.deliverable,
+                "status": action.status,
+                "source_topic": topic.title
+            })
+    
+    # 保存
+    with open(registry_path, "w", encoding="utf-8") as f:
+        json.dump(registry, f, ensure_ascii=False, indent=2)
+
+
+# ============ CLI ============
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage:")
+        print("  python meeting_skill.py <audio_file>")
+        print("  python meeting_skill.py --text <transcription_file>")
+        print("  python meeting_skill.py --update <meeting_id> --title '新标题'")
+        print("  python meeting_skill.py --query --date 2024-11-01")
+        sys.exit(1)
+    
+    if sys.argv[1] == "--text":
+        with open(sys.argv[2], "r", encoding="utf-8") as f:
+            meeting = generate_minutes(f.read())
+        print(json.dumps(meeting.to_dict(), ensure_ascii=False, indent=2))
+        files = save_meeting(meeting)
+        print(f"\nSaved to: {files}")
+    
+    elif sys.argv[1] == "--update":
+        meeting_id = sys.argv[2]
+        updates = {}
+        for i in range(3, len(sys.argv), 2):
+            if i + 1 < len(sys.argv) and sys.argv[i].startswith("--"):
+                key = sys.argv[i][2:]
+                updates[key] = sys.argv[i + 1]
+        meeting = update_meeting(meeting_id, **updates)
+        print(f"Updated to v{meeting.version}")
+    
+    elif sys.argv[1] == "--query":
+        # 简单查询示例
+        results = query_meetings()
+        print(f"Found {len(results)} meetings")
+        for r in results[:5]:
+            print(f"  - {r['date']} {r['title']} (v{r['version']})")
+    
+    else:
+        result = transcribe(sys.argv[1])
+        meeting = generate_minutes(result["full_text"])
+        print(json.dumps(meeting.to_dict(), ensure_ascii=False, indent=2))
+        files = save_meeting(meeting)
+        print(f"\nSaved to: {files}")
