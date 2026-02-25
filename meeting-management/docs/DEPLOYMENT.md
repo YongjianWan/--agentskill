@@ -602,6 +602,21 @@ bun tauri build
 |------|------|------|
 | whisper-rs-sys 编译失败 | Vulkan SDK 未安装或 VULKAN_SDK 环境变量未设置 | 安装 Vulkan SDK 并重启终端 |
 | 编译内存不足 | whisper.cpp 编译需要大量内存 | 关闭其他程序，或降低并行编译任务数 |
+| 路径过长错误 | Windows 默认路径长度限制 260 字符 | 使用短路径（如 C:\Handy）或启用长路径支持 |
+| 编码错误 C4819 | 源文件包含 Unicode 字符，MSVC 使用 GB2312 | 设置环境变量 `CL=/utf-8` |
+| Handy 源码编译错误 | 依赖版本冲突（tungstenite 版本不匹配） | 需修复 Handy 源码中的依赖版本 |
+
+### 编译状态（2026-02-25）
+
+✅ **已完成**：
+- Vulkan SDK 安装
+- 短路径设置（C:\Handy）
+- UTF-8 编码设置
+- whisper.cpp 编译成功
+
+🔴 **阻塞**：
+- Handy 源码存在编译错误（`MeetingBridge` 未导入、`tungstenite` 版本冲突）
+- 需等待 Handy 官方修复或手动修改源码
 
 ### 配置 Handy 连接服务器
 
