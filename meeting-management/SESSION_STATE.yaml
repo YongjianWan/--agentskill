@@ -10,7 +10,9 @@ meta:
 
 # === 系统状态 ===
 system:
-  phase: "ai-integration"
+  phase: "stabilization"
+  # stabilization: 功能基本可用，进入稳定化阶段
+  # 不再新增功能，专注修 bug 和优化体验
   # architecture-revision: 架构重构期（从 Skill 升级为功能模块）
   # day-N: 功能开发阶段
   # maintenance: 维护阶段
@@ -25,7 +27,30 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active: []
+  active:
+    - id: "DOC-001"
+      desc: "记录未来方向（知识库打通等）"
+      status: "completed"
+      note: "docs/未来方向.md"
+
+  next:
+    - id: "STABLE-001"
+      desc: "稳定化现有功能，修复潜在 bug"
+      subtasks:
+        - "检查边界情况处理"
+        - "完善错误处理机制"
+        - "补充关键日志"
+      deliverable: "AI 纪要生成功能稳定可用"
+      
+    - id: "FUTURE-001"
+      desc: "【未来】知识库打通"
+      note: "等灵犀知识库接口稳定后对接，见 docs/未来方向.md"
+      status: "parked"
+      
+    - id: "FUTURE-002"
+      desc: "【未来】实时推送增强"
+      note: "当前会后生成模式够用，以后再说"
+      status: "parked"
 
   completed:
     - id: "CRITICAL-001"
