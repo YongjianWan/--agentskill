@@ -6,27 +6,88 @@ meta:
   project: "meeting-management"
   version: "0.9-beta"
   updated: "2026-02-25"
-  session_count: 2
+  session_count: 3
 
 # === 系统状态 ===
 system:
-  phase: "pre-implementation"
-  # pre-implementation: 框架初始化、文档整理
+  phase: "testing-complete"
+  # architecture-revision: 架构重构期（从 Skill 升级为功能模块）
   # day-N: 功能开发阶段
   # maintenance: 维护阶段
 
   key_decisions:
-    - "AI 层与 Skill 层分离：AI 负责语义理解，Skill 负责数据/IO"
-    - "文件系统存储优先：JSON + Word 导出，数据库（v1.1）后加"
-    - "WebSocket 流式接收：适配 Handy 实时转写场景"
-    - "行动项全局台账：跨会议追踪任务状态"
+    - "【架构定位】灵犀'帮我听'声音模块，用户直接交互（非单纯 Skill）"
+    - "【处理原则】服务器处理（转写/理解/存储），前端纯展示"
+    - "【通信方式】WebSocket 长连接，音频流用户→服务器，结果服务器→用户"
+    - "【AI 角色】AI 决定启停、处理语义、调用查询接口，非直接面对用户"
+    - "【数据流向】音频上云→实时处理→推送展示；查询经 AI 整理后展示"
+    - "【演进路线】V1.0 基础闭环 → V1.5 实时增强 → V2.0 智能沉淀"
 
 # === 当前任务 ===
 tasks:
   active: []
 
+  completed:
+    - id: "BUG-003"
+      desc: "修复 update_meeting 中 action_items 反序列化错误"
+      done: "2026-02-25"
+      fix: "添加 _rebuild_topic 函数正确处理嵌套 ActionItem"
+      
+    - id: "TEST-001"
+      desc: "完成端到端测试"
+      done: "2026-02-25"
+      notes: "E2E测试通过，发现AI生成质量不可接受（结论0%，行动项16%准确率）"
+      
+    - id: "TEST-002"
+      desc: "完成功能缺口测试"
+      done: "2026-02-25"
+      notes: "识别6大缺口：AI生成、实时推送、状态持久化、用户隔离、音频输入、知识库集成"
+      
+    - id: "TEST-003"
+      desc: "完成边界情况测试"
+      done: "2026-02-25"
+      notes: "空文本、超长文本、特殊字符、大量行动项等场景通过"
+
   next:
+    - id: "CRITICAL-001"
+      desc: "【严重】接入 AI 生成会议纪要"
+      subtasks:
+        - "调研通义千问/其他 LLM API"
+        - "设计 AI 提示词（议题提取/结论识别/行动项抽取）"
+        - "实现 ai_generate_minutes(transcription) 接口"
+        - "替换弃用的规则引擎函数"
+        - "对比测试：AI生成 vs 规则引擎效果"
+      deliverable: "会议纪要由 AI 生成，结论和行动项准确率>80%"
+      note: "当前规则引擎结论命中率0%，行动项噪音30%，见 test_result.json"
+
+    - id: "CRITICAL-002"
+      desc: "【严重】WebSocket 实时推送"
+      subtasks:
+        - "设计推送协议（转写文本/议题标记/状态变更）"
+        - "实现服务端→前端推送机制"
+        - "前端接收展示逻辑（与灵犀前端对接）"
+        - "断线重连机制"
+      deliverable: "会议进行中前端实时显示字幕和议题标记"
+      note: "当前只接收不推送，前端无法展示实时内容"
+
     - id: "V1-001"
+      desc: "会议状态管理"
+      subtasks:
+        - "设计会议状态机（准备中/录音中/处理中/已完成）"
+        - "实现状态持久化（SQLite/Redis）"
+        - "查询当前活跃会议接口"
+        - "服务重启后状态恢复"
+      deliverable: "支持查询'当前谁在开会'，服务重启不丢状态"
+
+    - id: "V1-002"
+      desc: "用户权限隔离"
+      subtasks:
+        - "接入灵犀用户体系（user_id）"
+        - "会议数据归属绑定"
+        - "权限校验（只能看自己的会议）"
+      deliverable: "多人使用互不干扰，数据隔离"
+
+    - id: "V1-003"
       desc: "会议统计查询功能"
       subtasks:
         - "查询会议次数统计（按时间范围/关键词筛选）"
@@ -35,7 +96,7 @@ tasks:
         - "实现 get_meeting_summary() 接口"
       deliverable: "支持查询'开了几次会'、'有什么记录'等统计需求"
 
-    - id: "V1-002"
+    - id: "V1-004"
       desc: "数据库持久化层（SQLite）"
       subtasks:
         - "设计 Meeting/ActionItem 表结构"
@@ -45,7 +106,7 @@ tasks:
         - "支持复杂统计查询（会议次数、行动项完成率等）"
       deliverable: "save_meeting() 支持 storage='sqlite' 参数，解决 JSON 查询性能问题"
 
-    - id: "V1-003"
+    - id: "V1-005"
       desc: "Handy 集成 - 基础链路验证"
       subtasks:
         - "测试 WebSocket 端到端流程"
@@ -133,6 +194,18 @@ quickref:
     document: "python-docx"
     websocket: "websockets"
     storage: "JSON files (v0.x) / SQLite (v1.1+)"
+
+# === 待确认事项 ===
+pending_confirmation:
+  - item: "架构定位"
+    desc: "从 Skill 升级为功能模块，用户直接交互"
+    with: "老大"
+    note: "确认声音流向、AI调用方式、前端职责"
+
+  - item: "实时转写链路"
+    desc: "WebSocket 长连接细节，数据推送频率"
+    with: "老大"
+    note: "确认技术实现方案"
 
 # === 首读流程 ===
 reading_order:

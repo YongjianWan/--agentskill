@@ -499,7 +499,30 @@ def update_meeting(
             data[key] = value
     
     # 重建 Meeting 对象
-    topics = [Topic(**t) for t in data.get("topics", [])]
+    def _rebuild_topic(t_data: dict) -> Topic:
+        """Rebuild Topic from dict, handling nested ActionItem"""
+        # Handle action_items
+        action_items_data = t_data.get("action_items", [])
+        action_items = []
+        for a_data in action_items_data:
+            if isinstance(a_data, dict):
+                # Filter valid fields for ActionItem
+                valid_fields = {"action", "owner", "deadline", "deliverable", "status", "source_topic", 
+                               "related_policy", "related_enterprise", "related_project"}
+                filtered = {k: v for k, v in a_data.items() if k in valid_fields}
+                action_items.append(ActionItem(**filtered))
+            elif isinstance(a_data, ActionItem):
+                action_items.append(a_data)
+        
+        return Topic(
+            title=t_data.get("title", ""),
+            discussion_points=t_data.get("discussion_points", []),
+            conclusion=t_data.get("conclusion", ""),
+            uncertain=t_data.get("uncertain", []),
+            action_items=action_items
+        )
+    
+    topics = [_rebuild_topic(t) for t in data.get("topics", [])]
     meeting = Meeting(
         id=data["id"],
         title=data["title"],
