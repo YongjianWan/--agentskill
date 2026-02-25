@@ -542,6 +542,82 @@ cp .env.backup .env
 
 ---
 
-**文档版本**: v1.0
+## 附录：Handy 客户端编译（可选）
+
+> 当前阶段：Handy 编译**非必需**，服务器可使用 Mock 客户端测试  
+> 建议在 **V1.5 实时增强阶段** 再进行 Handy 编译
+
+### 环境要求
+
+| 组件 | 版本 | 用途 |
+|------|------|------|
+| Rust | 1.70+ | Handy 后端编译 |
+| Bun | 1.0+ | 前端构建 |
+| CMake | 3.20+ | whisper.cpp 构建 |
+| Vulkan SDK | 最新 | GPU 加速转写 |
+
+### Windows 安装步骤
+
+**1. 安装 Rust**
+```powershell
+# https://rustup.rs/
+Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
+.\rustup-init.exe
+```
+
+**2. 安装 Bun**
+```powershell
+# https://bun.sh/
+powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
+**3. 安装 Visual Studio Build Tools**
+- 下载：https://visualstudio.microsoft.com/downloads/
+- 安装 "使用 C++ 的桌面开发" 工作负载
+
+**4. 安装 Vulkan SDK**
+```powershell
+# 下载并安装
+Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile "vulkan-sdk.exe"
+.\vulkan-sdk.exe
+
+# 重启终端后验证
+$env:VULKAN_SDK
+vulkaninfo
+```
+
+**5. 编译 Handy**
+```bash
+cd Handy-source
+bun install
+bun tauri build
+
+# 输出位置
+# src-tauri/target/release/bundle/nsis/Handy-setup.exe
+```
+
+### 已知问题
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| whisper-rs-sys 编译失败 | Vulkan SDK 未安装或 VULKAN_SDK 环境变量未设置 | 安装 Vulkan SDK 并重启终端 |
+| 编译内存不足 | whisper.cpp 编译需要大量内存 | 关闭其他程序，或降低并行编译任务数 |
+
+### 配置 Handy 连接服务器
+
+编辑 Handy 配置文件：
+```bash
+# Windows: %APPDATA%\Handy\config.json
+{
+  "meeting_bridge": {
+    "enabled": true,
+    "websocket_url": "ws://服务器IP:8765/ws/meeting"
+  }
+}
+```
+
+---
+
+**文档版本**: v1.1
 **最后更新**: 2026-02-25
 **维护人**: -
