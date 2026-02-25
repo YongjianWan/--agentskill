@@ -224,6 +224,13 @@ quickref:
     document: "python-docx"
     websocket: "websockets"
     storage: "JSON files (v0.x) / SQLite (v1.1+)"
+  test_dir: "test/"
+  test_scripts:
+    - "test_ai_vs_rule.py"
+    - "test_deepseek.py"
+    - "test_edge_cases.py"
+    - "test_query_update.py"
+    - "test_concurrent.py"
 
 # === 待确认事项 ===
 pending_confirmation:
