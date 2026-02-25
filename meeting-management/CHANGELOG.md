@@ -18,6 +18,7 @@ meta:
 - [x] PROJECT_CONTEXT.md 创建 (2026-02-25)
 - [x] SESSION_STATE.yaml 创建 (2026-02-25)
 - [x] CHANGELOG.md 创建 (2026-02-25)
+- [ ] 会议统计查询功能 (count_meetings, get_meeting_summary)
 - [ ] WebSocket 端到端集成测试
 - [ ] 中文路径/文件名处理验证
 - [ ] 并发会议场景测试
@@ -30,6 +31,7 @@ meta:
 - AI 层与 Skill 层分离：AI 负责语义理解（议题提取、结论识别），Skill 负责数据层（转写、存储、导出）
 - 文件系统优先：v0.x 使用 JSON + Word，v1.1 引入 SQLite 作为可选后端
 - WebSocket 流式接收：适配 Handy 实时转写场景，按会议 ID 隔离会话
+- **双核心方向**：① 数据统计查询（解决'开了几次会'）② 实时转译增强（流式转写+实时纪要）
 
 ---
 

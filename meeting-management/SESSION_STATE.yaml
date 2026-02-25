@@ -6,7 +6,7 @@ meta:
   project: "meeting-management"
   version: "0.9-beta"
   updated: "2026-02-25"
-  session_count: 1
+  session_count: 2
 
 # === 系统状态 ===
 system:
@@ -23,34 +23,53 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active:
-    - id: "INIT-001"
-      desc: "按 LifeOS 协议初始化 L1 核心文档"
-      subtasks:
-        - "创建 PROJECT_CONTEXT.md"
-        - "创建 SESSION_STATE.yaml"
-        - "创建 CHANGELOG.md"
-      deliverable: "根目录存在 3 个 L1 文档，git status 显示新增"
+  active: []
 
   next:
     - id: "V1-001"
+      desc: "会议统计查询功能"
+      subtasks:
+        - "查询会议次数统计（按时间范围/关键词筛选）"
+        - "查询会议记录详情（议题、行动项、风险点等）"
+        - "实现 count_meetings() 接口"
+        - "实现 get_meeting_summary() 接口"
+      deliverable: "支持查询'开了几次会'、'有什么记录'等统计需求"
+
+    - id: "V1-002"
       desc: "数据库持久化层（SQLite）"
       subtasks:
         - "设计 Meeting/ActionItem 表结构"
         - "实现 SQLite 存储后端（可选切换）"
         - "迁移现有 JSON 数据"
         - "更新 query_meetings 支持 SQL 查询"
-      deliverable: "save_meeting() 支持 storage='sqlite' 参数"
+        - "支持复杂统计查询（会议次数、行动项完成率等）"
+      deliverable: "save_meeting() 支持 storage='sqlite' 参数，解决 JSON 查询性能问题"
 
-    - id: "V1-002"
-      desc: "Handy 集成验证"
+    - id: "V1-003"
+      desc: "Handy 集成 - 基础链路验证"
       subtasks:
         - "测试 WebSocket 端到端流程"
         - "验证中文路径/文件名处理"
         - "处理并发会议场景"
-      deliverable: "Handy 转写流 → 会议纪要 Word 文档 全流程跑通"
+        - "Handy 转写流 → 会议纪要 Word 文档 全流程跑通"
+      deliverable: "Handy 实时流转写能正常保存为会议纪要"
+
+    - id: "V2-000"
+      desc: "【战略方向】Handy 实时转译增强"
+      subtasks:
+        - "实时转写显示：边说边出文字（利用 Handy 实时流）"
+        - "实时会议纪要草稿：会议进行中同步提取议题和结论"
+        - "增量式纪要生成：接收一段处理一段，非等会议结束"
+        - "会议结束自动精修：基于完整上下文优化纪要"
+      deliverable: "会议进行中即可看到实时转写和初步纪要，会议结束自动生成精修版"
+      note: "这是 Handy 集成的增强版，核心是利用 Handy 的实时流转写能力"
 
   completed:
+    - id: "INIT-001"
+      desc: "按 LifeOS 协议初始化 L1 核心文档"
+      done: "2026-02-25"
+      notes: "git init 独立仓库，创建 PROJECT_CONTEXT/SESSION_STATE/CHANGELOG，排除 Handy/ 和 openclaw的skill/"
+
     - id: "V0-001"
       desc: "核心 Skill 接口"
       done: "2026-02-20"

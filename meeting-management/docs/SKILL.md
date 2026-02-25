@@ -302,7 +302,3 @@ pip install faster-whisper python-docx websockets
 
 
 
-我想看这次会议开了几次会？
-还有就是什么记录？
-还有就是？
-说白了还得搞一个数据库。
