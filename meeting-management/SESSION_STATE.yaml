@@ -6,7 +6,7 @@ meta:
   project: "meeting-management"
   version: "0.9-beta"
   updated: "2026-02-25"
-  session_count: 3
+  session_count: 4
 
 # === 系统状态 ===
 system:
