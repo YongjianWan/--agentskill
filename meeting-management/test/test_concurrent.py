@@ -41,13 +41,17 @@ async def simulate_client(client_id, duration=3):
 
 async def test_concurrent():
     """测试多客户端并发"""
+    import sys
+    from pathlib import Path
+    
     print('='*60)
     print('测试并发会议场景')
     print('='*60)
     
     # 先启动服务器
-    import sys
-    sys.path.insert(0, 'scripts')
+    # 添加 scripts 目录到路径（相对于脚本位置）
+    scripts_dir = Path(__file__).parent.parent / 'scripts'
+    sys.path.insert(0, str(scripts_dir))
     from websocket_server import meeting_manager, handle_websocket
     
     async def route(websocket):
