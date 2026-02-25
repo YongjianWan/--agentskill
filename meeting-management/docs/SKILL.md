@@ -300,5 +300,53 @@ pip install faster-whisper python-docx websockets
 | 数据存储   | Skill  | JSON/DOCX 导出    |
 | 格式排版   | Skill  | Word 文档生成     |
 
+---
+
+## 附录：本地测试指南
+
+> 合并自 README_TEST.md
+
+### 快速开始（5分钟跑通）
+
+#### 1. 安装依赖
+
+```bash
+pip install faster-whisper python-docx pyaudio websockets
+```
+
+**注意**：pyaudio 安装可能遇到问题
+- **Windows**: `pip install pipwin && pipwin install pyaudio`
+- **Mac**: `brew install portaudio && pip install pyaudio`
+
+#### 2. 测试转写功能（无需录音）
+
+```python
+from meeting_skill import transcribe, create_meeting_skeleton, save_meeting
+
+# 转写
+result = transcribe("meeting.mp3")
+
+# 创建并保存
+meeting = create_meeting_skeleton(result["full_text"], title="测试会议")
+files = save_meeting(meeting)
+print(f"已保存: {files['docx']}")
+```
+
+#### 3. 测试录音功能（需要麦克风）
+
+```bash
+python scripts/recorder.py
+# > start 测试会议
+# > stop
+```
+
+### 测试检查清单
+
+- [ ] 依赖安装成功
+- [ ] 文本转写测试通过
+- [ ] JSON 文件生成正确
+- [ ] DOCX 文件可以正常打开
+- [ ] 录音功能正常（可选）
+
 
 
