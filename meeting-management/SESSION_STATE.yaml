@@ -6,7 +6,7 @@ meta:
   project: "meeting-management"
   version: "0.9-beta"
   updated: "2026-02-25"
-  session_count: 5
+  session_count: 7
 
 # === 系统状态 ===
 system:
@@ -27,25 +27,19 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active:
-    - id: "STABLE-002"
-      desc: "测试稳定化改进"
+  active: []
+      
+  next:
+    - id: "READY-001"
+      desc: "准备 v1.0 发布"
       status: "pending"
       subtasks:
-        - "运行单元测试验证错误处理"
-        - "测试边界情况（空文本/超长文本/磁盘满）"
-        - "验证日志输出正确"
-      deliverable: "所有边界测试通过"
+        - "最终集成测试"
+        - "性能基准测试"
+        - "文档最终检查"
+      deliverable: "v1.0 正式发布准备就绪"
 
   next:
-    - id: "STABLE-001"
-      desc: "稳定化现有功能，修复潜在 bug"
-      subtasks:
-        - "检查边界情况处理"
-        - "完善错误处理机制"
-        - "补充关键日志"
-      deliverable: "AI 纪要生成功能稳定可用"
-      
     - id: "FUTURE-001"
       desc: "【未来】知识库打通"
       note: "等灵犀知识库接口稳定后对接，见 docs/未来方向.md"

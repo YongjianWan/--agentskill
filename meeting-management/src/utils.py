@@ -8,6 +8,8 @@
 """
 
 import functools
+import os
+import platform
 import shutil
 import signal
 import sys
@@ -113,8 +115,12 @@ def safe_write_file(
     if check_space:
         check_disk_space(file_path.parent, MIN_FREE_SPACE_MB)
     
+    # 确保父目录存在
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
     # 创建临时文件并写入
     temp_file = None
+    fd = None
     try:
         # 使用临时文件，确保原子性写入
         fd, temp_path = tempfile.mkstemp(
@@ -125,24 +131,41 @@ def safe_write_file(
         temp_file = Path(temp_path)
         
         try:
-            with os.fdopen(fd, 'wb') as f:
-                f.write(content_bytes)
+            # 写入内容
+            os.write(fd, content_bytes)
+            os.fsync(fd)  # 确保写入磁盘
         except OSError as e:
-            # 写入失败，清理临时文件
-            temp_file.unlink(missing_ok=True)
             if e.errno == 28:  # ENOSPC - 磁盘满
                 raise DiskFullError(f"磁盘已满，无法写入文件: {file_path}")
             raise
+        finally:
+            # 关闭文件描述符
+            if fd is not None:
+                os.close(fd)
+                fd = None
         
         # 原子性地移动到目标位置
+        if platform.system() == 'Windows':
+            # Windows: 如果目标文件存在，先删除
+            if file_path.exists():
+                file_path.unlink()
+        
         temp_file.replace(file_path)
         
         return file_path
         
     except Exception:
         # 清理临时文件
+        if fd is not None:
+            try:
+                os.close(fd)
+            except:
+                pass
         if temp_file and temp_file.exists():
-            temp_file.unlink(missing_ok=True)
+            try:
+                temp_file.unlink()
+            except:
+                pass
         raise
 
 
