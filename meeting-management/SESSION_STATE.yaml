@@ -10,7 +10,7 @@ meta:
 
 # === 系统状态 ===
 system:
-  phase: "testing-complete"
+  phase: "ai-integration"
   # architecture-revision: 架构重构期（从 Skill 升级为功能模块）
   # day-N: 功能开发阶段
   # maintenance: 维护阶段
@@ -28,6 +28,11 @@ tasks:
   active: []
 
   completed:
+    - id: "CRITICAL-001"
+      desc: "接入 DeepSeek AI 生成会议纪要"
+      done: "2026-02-25"
+      notes: "结论率从0%提升至100%，行动项准确率显著提升，已替换弃用规则引擎"
+      
     - id: "BUG-003"
       desc: "修复 update_meeting 中 action_items 反序列化错误"
       done: "2026-02-25"

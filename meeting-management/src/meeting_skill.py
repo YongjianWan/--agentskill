@@ -369,16 +369,90 @@ def generate_minutes(
     participants: Optional[List[str]] = None,
     recorder: str = "",
     audio_path: Optional[str] = None,
-    version: int = 1
+    version: int = 1,
+    use_ai: bool = True
 ) -> Meeting:
     """
-    【已弃用】请使用 create_meeting_skeleton()
+    生成会议纪要（现在使用 DeepSeek AI）
     
-    原函数尝试用规则引擎做智能提取，效果差（结论命中率0%，行动项噪音30%）。
-    根据新设计，智能理解应由 AI 完成，Skill 只提供数据骨架。
-    
-    本函数现直接代理到 create_meeting_skeleton()。
+    Args:
+        transcription: 转写文本
+        title: 会议标题
+        use_ai: 是否使用 AI 生成（默认 True）
+        ... 其他参数
+        
+    Returns:
+        Meeting 对象（topics 已由 AI 填充）
     """
+    if date is None:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    # 生成会议ID
+    if meeting_id is None:
+        meeting_id = _generate_meeting_id(date, title or "未命名会议")
+    
+    # 基础参会人提取
+    segments = _parse_transcription(transcription)
+    detected_participants = participants or _extract_participants_basic(segments)
+    
+    # 使用 AI 生成纪要内容
+    if use_ai:
+        try:
+            from .ai_minutes_generator import generate_minutes_with_ai
+            
+            ai_result = generate_minutes_with_ai(transcription, title_hint=title)
+            
+            if ai_result:
+                # 使用 AI 生成的标题（如果未提供）
+                ai_title = ai_result.get("title", title or "未命名会议")
+                
+                # 转换 topics
+                ai_topics = []
+                for t in ai_result.get("topics", []):
+                    action_items = []
+                    for a in t.get("action_items", []):
+                        action_items.append(ActionItem(
+                            action=a.get("action", ""),
+                            owner=a.get("owner", "待定"),
+                            deadline=a.get("deadline", ""),
+                            deliverable="",
+                            status="待处理"
+                        ))
+                    
+                    ai_topics.append(Topic(
+                        title=t.get("title", "未命名议题"),
+                        discussion_points=t.get("discussion_points", []),
+                        conclusion=t.get("conclusion", ""),
+                        uncertain=[],
+                        action_items=action_items
+                    ))
+                
+                # 使用 AI 识别的参会人（如果有）
+                ai_participants = ai_result.get("participants", detected_participants)
+                
+                meeting = Meeting(
+                    id=meeting_id,
+                    title=ai_title,
+                    date=date,
+                    time_range=time_range,
+                    location=location,
+                    participants=ai_participants,
+                    recorder=recorder,
+                    topics=ai_topics,
+                    risks=ai_result.get("risks", []),
+                    pending_confirmations=ai_result.get("pending_confirmations", []),
+                    audio_path=audio_path,
+                    version=version
+                )
+                
+                # 标记为 AI 生成
+                meeting.status = "ai_generated"
+                return meeting
+                
+        except Exception as e:
+            print(f"[generate_minutes] AI 生成失败，降级到骨架模式: {e}")
+    
+    # 降级：返回骨架（AI 失败或 use_ai=False）
     return create_meeting_skeleton(
         transcription=transcription,
         meeting_id=meeting_id,
@@ -386,7 +460,7 @@ def generate_minutes(
         date=date,
         time_range=time_range,
         location=location,
-        participants=participants,
+        participants=detected_participants,
         recorder=recorder,
         audio_path=audio_path,
         version=version
