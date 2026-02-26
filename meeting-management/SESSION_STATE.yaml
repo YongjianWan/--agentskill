@@ -29,11 +29,13 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active:
+  active: []
+      
+  completed:
     - id: "WS-001"
       desc: "【WebSocket】改造协议为start/chunk/end，对接音频流处理"
-      status: "in_progress"
-      start: "2026-02-26"
+      status: "completed"
+      done: "2026-02-26"
       
   next:
     - id: "DB-001"
