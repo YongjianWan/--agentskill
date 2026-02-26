@@ -94,21 +94,21 @@ async def get_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    return MeetingResponse(
-        session_id=meeting.session_id,
-        user_id=meeting.user_id,
-        title=meeting.title,
-        status=meeting.status,
-        created_at=meeting.created_at,  # type: ignore
-        updated_at=meeting.updated_at,  # type: ignore
-        start_time=meeting.start_time,  # type: ignore
-        end_time=meeting.end_time,  # type: ignore
-        duration_ms=format_duration_ms(meeting.start_time, meeting.end_time),
-        participants=meeting.participants or [],
-        location=meeting.location or "",
-        audio_path=meeting.audio_path,
-        transcript_count=len(meeting.transcript_segments or [])
-    )
+    return MeetingResponse.model_validate({
+        "session_id": meeting.session_id,
+        "user_id": meeting.user_id,
+        "title": meeting.title,
+        "status": meeting.status,
+        "created_at": meeting.created_at,
+        "updated_at": meeting.updated_at,
+        "start_time": meeting.start_time,
+        "end_time": meeting.end_time,
+        "duration_ms": format_duration_ms(meeting.start_time, meeting.end_time),
+        "participants": meeting.participants or [],
+        "location": meeting.location or "",
+        "audio_path": meeting.audio_path,
+        "transcript_count": len(meeting.transcript_segments or [])
+    })
 
 
 @router.post("/meetings/{session_id}/start")
