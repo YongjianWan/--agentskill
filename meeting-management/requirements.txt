@@ -1,0 +1,28 @@
+# Meeting Management Backend
+# Python 3.11+
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+websockets==13.1
+python-multipart==0.0.17
+
+# Database
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+asyncpg==0.30.0  # PostgreSQL/瀚高HighGoDB异步驱动
+
+# Audio Processing
+# faster-whisper==1.1.0  # Phase 3启用
+# ffmpeg-python==0.2.0   # Phase 3启用
+
+# AI Integration
+# openai==1.55.0         # Phase 4启用
+
+# Utilities
+pydantic==2.10.0
+python-dotenv==1.0.1
+aiofiles==24.1.0
+
+# Logging
+loguru==0.7.2

@@ -1,0 +1,12 @@
+{
+  "include": ["src"],
+  "exclude": ["test", "__pycache__"],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "off",
+  "reportGeneralTypeIssues": "none",
+  "reportArgumentType": "none",
+  "reportAssignmentType": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportAttributeAccessIssue": "none"
+}

@@ -113,7 +113,7 @@ def safe_write_file(
     
     # 检查磁盘空间
     if check_space:
-        check_disk_space(file_path.parent, MIN_FREE_SPACE_MB)
+        check_disk_space(str(file_path.parent), MIN_FREE_SPACE_MB)
     
     # 确保父目录存在
     file_path.parent.mkdir(parents=True, exist_ok=True)

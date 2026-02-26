@@ -52,6 +52,7 @@ files = save_meeting(meeting, output_dir="./output")
 ## Data Model
 
 ### Meeting
+
 ```python
 @dataclass
 class Meeting:
@@ -62,12 +63,12 @@ class Meeting:
     topics: List[Topic]
     risks: List[str]
     pending_confirmations: List[str]
-    
+  
     # Entity linking (AI recognizes from content)
     policy_refs: List[PolicyRef]       # Policy references
     enterprise_refs: List[EnterpriseRef]  # Enterprise mentions
     project_refs: List[ProjectRef]     # Project associations
-    
+  
     # Auto-generated (Skill)
     id: str  # M{YYYYMMDD}_{HHMMSS}_{hash6}
     version: int = 1
@@ -75,6 +76,7 @@ class Meeting:
 ```
 
 ### Topic
+
 ```python
 @dataclass
 class Topic:
@@ -86,6 +88,7 @@ class Topic:
 ```
 
 ### ActionItem
+
 ```python
 @dataclass
 class ActionItem:
@@ -94,7 +97,7 @@ class ActionItem:
     deadline: str                       # AI extracts date
     deliverable: str = ""               # AI infers
     status: str = "待处理"
-    
+  
     # Optional entity linking
     related_policy: Optional[PolicyRef]
     related_enterprise: Optional[EnterpriseRef]
@@ -102,6 +105,7 @@ class ActionItem:
 ```
 
 ### Entity References (Future Integration)
+
 ```python
 @dataclass
 class PolicyRef:
@@ -126,6 +130,7 @@ class ProjectRef:
 ## Core Functions
 
 ### transcribe(audio_path, model="small", language="zh")
+
 ```python
 {
     "segments": [{"timestamp": "00:00:01", "speaker": "...", "text": "..."}],
@@ -137,16 +142,19 @@ class ProjectRef:
 ```
 
 ### create_meeting_skeleton(transcription, **kwargs)
+
 - Parses transcription text
 - Creates empty Meeting structure
 - AI fills topics, risks, action_items
 
 ### save_meeting(meeting, output_dir="./output")
+
 - Saves JSON + DOCX + latest symlink
 - Creates action registry
 - Returns file paths
 
 ### query_meetings(output_dir, date_range, keywords)
+
 - Query historical meetings
 - Returns list of Meeting dicts
 
@@ -171,6 +179,7 @@ User Request -> AI Agent -> Skill API
 ## Recording Options
 
 ### Option A: Meeting Assistant (Recommended)
+
 ```bash
 python scripts/meeting_assistant.py
 # > start "Meeting Title"  # Start recording
@@ -178,11 +187,13 @@ python scripts/meeting_assistant.py
 ```
 
 ### Option B: Process Existing Audio
+
 ```bash
 python scripts/meeting_assistant.py quick meeting.wav --title "Review"
 ```
 
 ### Option C: WebSocket (Requires Handy Client)
+
 ```bash
 python scripts/websocket_server.py --port 8765
 # Handy client streams transcription via WebSocket
@@ -191,6 +202,7 @@ python scripts/websocket_server.py --port 8765
 ## Output Format
 
 ### JSON Structure
+
 ```json
 {
   "id": "M20260225_143012_a1b2c3",
@@ -216,6 +228,7 @@ python scripts/websocket_server.py --port 8765
 ```
 
 ### DOCX Structure
+
 ```
 会议纪要：{title}
 
@@ -237,34 +250,37 @@ python scripts/websocket_server.py --port 8765
 ```
 
 ## Dependencies
+
 ```bash
 pip install faster-whisper python-docx pyaudio websockets
 ```
 
 ## Architecture
 
-| Layer | Responsibility | This Skill | AI Agent |
-|-------|----------------|------------|----------|
-| Data | Transcription, storage, I/O | ✅ | ❌ |
-| Intelligence | Understanding, extraction | ❌ | ✅ |
+| Layer        | Responsibility              | This Skill | AI Agent |
+| ------------ | --------------------------- | ---------- | -------- |
+| Data         | Transcription, storage, I/O | ✅         | ❌       |
+| Intelligence | Understanding, extraction   | ❌         | ✅       |
 
 **Rule**: Skill provides scaffolding, AI fills content.
 
 ## Status
 
-| Component | Status | Note |
-|-----------|--------|------|
-| transcribe() | ✅ | Whisper small model |
-| create_meeting_skeleton() | ✅ | Creates empty structure |
-| save_meeting() | ✅ | JSON + DOCX output |
-| Entity linking | ✅ | Fields reserved for future |
-| Handy client | ❌ | Blocked: CMake + Vulkan SDK |
+| Component                 | Status | Note                        |
+| ------------------------- | ------ | --------------------------- |
+| transcribe()              | ✅     | Whisper small model         |
+| create_meeting_skeleton() | ✅     | Creates empty structure     |
+| save_meeting()            | ✅     | JSON + DOCX output          |
+| Entity linking            | ✅     | Fields reserved for future  |
+| Handy client              | ❌     | Blocked: CMake + Vulkan SDK |
 
 ## File Structure
+
 ```
 src/meeting_skill.py          # Core API
 scripts/meeting_assistant.py  # CLI entry point
 scripts/recorder.py           # Audio recording
 scripts/websocket_server.py   # WebSocket server
 docs/online_meeting_guide.md  # Virtual audio setup
+tast/                         # 测试文件
 ```

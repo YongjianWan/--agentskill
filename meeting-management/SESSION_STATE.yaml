@@ -4,54 +4,106 @@
 
 meta:
   project: "meeting-management"
-  version: "0.9-beta"
-  updated: "2026-02-25"
-  session_count: 7
+  version: "1.0-beta"
+  updated: "2026-02-26"
+  session_count: 9
 
 # === 系统状态 ===
 system:
-  phase: "stabilization"
+  phase: "re-architecture"
+  # re-architecture: 架构重构期（抛弃Handy，浏览器直连自建转写后端）
   # stabilization: 功能基本可用，进入稳定化阶段
-  # 不再新增功能，专注修 bug 和优化体验
   # architecture-revision: 架构重构期（从 Skill 升级为功能模块）
   # day-N: 功能开发阶段
   # maintenance: 维护阶段
 
   key_decisions:
-    - "【架构定位】灵犀'帮我听'声音模块，用户直接交互（非单纯 Skill）"
-    - "【处理原则】服务器处理（转写/理解/存储），前端纯展示"
-    - "【通信方式】WebSocket 长连接，音频流用户→服务器，结果服务器→用户"
-    - "【AI 角色】AI 决定启停、处理语义、调用查询接口，非直接面对用户"
-    - "【数据流向】音频上云→实时处理→推送展示；查询经 AI 整理后展示"
+    - "【架构定位】灵犀'帮我听'声音模块，后端独立服务"
+    - "【职责边界】只负责后端，前端按API接入"
+    - "【处理原则】服务器处理（转写/理解/存储）"
+    - "【通信方式】REST API + WebSocket"
+    - "【AI 角色】AI处理语义、生成纪要"
     - "【演进路线】V1.0 基础闭环 → V1.5 实时增强 → V2.0 智能沉淀"
-    - "【Handy 编译】V1.5 阶段进行。当前：Vulkan SDK ✅，短路径 ✅，UTF-8 ✅，whisper.cpp ✅。阻塞：Handy 源码错误（依赖版本冲突）"
+    - "【架构调整-2026-02-25】浏览器直连后端，Handy转备选方案"
+    - "【架构重构-2026-02-26】抛弃Handy，自建转写后端（浏览器MediaRecorder → 后端Whisper）"
 
 # === 当前任务 ===
 tasks:
-  active: []
+  active:
+    - id: "ARCH-001"
+      desc: "架构重构：抛弃Handy，浏览器直连音频流转写"
+      status: "in_progress"
+      start: "2026-02-26"
       
   next:
-    - id: "READY-001"
-      desc: "准备 v1.0 发布"
+    - id: "DB-001"
+      desc: "【数据库】扩展表结构支持音频流存储"
       status: "pending"
       subtasks:
-        - "最终集成测试"
-        - "性能基准测试"
-        - "文档最终检查"
-      deliverable: "v1.0 正式发布准备就绪"
-
-  next:
-    - id: "FUTURE-001"
-      desc: "【未来】知识库打通"
-      note: "等灵犀知识库接口稳定后对接，见 docs/未来方向.md"
-      status: "parked"
+        - "meetings表新增：audio_path, minutes_path, status"
+        - "新增transcripts表：sequence, text, timestamp"
+        - "新增topics表：title, conclusion"
+        - "新增action_items表：content, assignee, due_date, status"
+      note: "SQLite先用，保持SQLAlchemy兼容瀚高"
       
-    - id: "FUTURE-002"
-      desc: "【未来】实时推送增强"
-      note: "当前会后生成模式够用，以后再说"
-      status: "parked"
+    - id: "SKILL-001"
+      desc: "【meeting_skill】新增音频流处理方法"
+      status: "pending"
+      subtasks:
+        - "MeetingSessionManager类：管理音频文件句柄"
+        - "transcribe_bytes(audio_bytes)：直接转写bytes"
+        - "generate_minutes_after_meeting(meeting_id)：会后全量生成纪要"
+      note: "转写触发策略：按时间30秒一次"
+      
+    - id: "WS-001"
+      desc: "【WebSocket】简化协议，直接接收音频块"
+      status: "pending"
+      subtasks:
+        - "消息协议简化：start/chunk/end"
+        - "start：创建meeting，初始化audio.webm"
+        - "chunk：追加写入，每30秒触发转写"
+        - "end：关闭文件，全量转写剩余，生成纪要，导出Word"
+      note: "删除旧Handy相关代码"
+      
+    - id: "TEST-001"
+      desc: "【测试】端到端音频流测试"
+      status: "pending"
+      subtasks:
+        - "Python模拟客户端发送音频块"
+        - "验证全链路：上传→转写→存库→生成纪要→导出Word"
+      note: "测试脚本用mock音频数据"
+      
+    - id: "CLEAN-001"
+      desc: "【清理】删除旧Handy相关代码"
+      status: "pending"
+      subtasks:
+        - "删除scripts/websocket_server.py（旧Handy版）"
+        - "删除scripts/websocket_server_v2.py"
+        - "删除Handy相关测试脚本"
+      note: "旧代码就是负债，直接删不留legacy"
 
   completed:
+    - id: "BACKEND-001"
+      desc: "【后端开发】Phase 1: REST API骨架"
+      done: "2026-02-25"
+      subtasks:
+        - "✅ REST API 骨架：会议CRUD（POST/GET /meetings）"
+        - "✅ 文件上传接口：POST /upload/audio"
+        - "✅ 数据库持久化：SQLAlchemy模型（SQLite+瀚高HighGoDB双支持）"
+        - "✅ 历史查询接口：GET /meetings 列表查询"
+      deliverable: "FastAPI框架 + REST API + 数据库模型"
+
+    - id: "BACKEND-002"
+      desc: "【后端开发】Phase 2: WebSocket + 实时转写"
+      done: "2026-02-25"
+      subtasks:
+        - "✅ WebSocket服务：音频流接收（/ws/meeting/{id}）"
+        - "✅ 音频缓存合并：片段缓存→合并→转写"
+        - "✅ Mock实时转写：模拟Whisper逐段转写"
+        - "✅ 实时字幕推送：transcript下行消息"
+        - "✅ 转写文本编辑：支持前端编辑后保存"
+      deliverable: "WebSocket实时音频流 + 实时字幕推送"
+      
     - id: "STABLE-001"
       desc: "稳定化现有功能，修复潜在 bug"
       done: "2026-02-25"
@@ -63,171 +115,53 @@ tasks:
         4. 边界处理: 磁盘空间检查、安全文件写入、内存检查、文本验证
         新增文件: src/logger_config.py, src/utils.py
       deliverable: "AI 纪要生成功能稳定可用"
+
+# === 重构决策记录 ===
+rearchitecture:
+  trigger: "抛弃Handy，浏览器MediaRecorder直连后端"
+  date: "2026-02-26"
+  
+  changes:
+    - area: "输入源"
+      before: "Handy长连接 → websocket_server.py"
+      after: "浏览器MediaRecorder → 后端WebSocket"
       
-    - id: "DOC-002"
-      desc: "编写服务器部署文档"
-      done: "2026-02-25"
-      notes: "DEPLOYMENT.md - 包含依赖库、部署步骤、交接清单"
+    - area: "接收数据"
+      before: "接收Handy转写后的文字"
+      after: "接收音频块(bytes)，后端自己转写"
       
-    - id: "CRITICAL-001"
-      desc: "接入 DeepSeek AI 生成会议纪要"
-      done: "2026-02-25"
-      notes: "结论率从0%提升至100%，行动项准确率显著提升，已替换弃用规则引擎"
+    - area: "转写触发"
+      before: "Handy触发，后端被动接收"
+      after: "后端每30秒触发一次Whisper转写"
       
-    - id: "BUG-003"
-      desc: "修复 update_meeting 中 action_items 反序列化错误"
-      done: "2026-02-25"
-      fix: "添加 _rebuild_topic 函数正确处理嵌套 ActionItem"
+    - area: "纪要生成"
+      before: "原有逻辑"
+      after: "会议结束后全量生成（非实时增量）"
       
-    - id: "TEST-001"
-      desc: "完成端到端测试"
-      done: "2026-02-25"
-      notes: "E2E测试通过，发现AI生成质量不可接受（结论0%，行动项16%准确率）"
+    - area: "文件存储"
+      before: "JSON存储转写结果"
+      after: "audio.webm + transcripts表 + minutes.docx"
       
-    - id: "TEST-002"
-      desc: "完成功能缺口测试"
-      done: "2026-02-25"
-      notes: "识别6大缺口：AI生成、实时推送、状态持久化、用户隔离、音频输入、知识库集成"
-      
-    - id: "TEST-003"
-      desc: "完成边界情况测试"
-      done: "2026-02-25"
-      notes: "空文本、超长文本、特殊字符、大量行动项等场景通过"
-
-  next:
-    - id: "CRITICAL-001"
-      desc: "【严重】接入 AI 生成会议纪要"
-      subtasks:
-        - "调研通义千问/其他 LLM API"
-        - "设计 AI 提示词（议题提取/结论识别/行动项抽取）"
-        - "实现 ai_generate_minutes(transcription) 接口"
-        - "替换弃用的规则引擎函数"
-        - "对比测试：AI生成 vs 规则引擎效果"
-      deliverable: "会议纪要由 AI 生成，结论和行动项准确率>80%"
-      note: "当前规则引擎结论命中率0%，行动项噪音30%，见 test_result.json"
-
-    - id: "CRITICAL-002"
-      desc: "【严重】WebSocket 实时推送"
-      subtasks:
-        - "设计推送协议（转写文本/议题标记/状态变更）"
-        - "实现服务端→前端推送机制"
-        - "前端接收展示逻辑（与灵犀前端对接）"
-        - "断线重连机制"
-      deliverable: "会议进行中前端实时显示字幕和议题标记"
-      note: "当前只接收不推送，前端无法展示实时内容"
-
-    - id: "V1-001"
-      desc: "会议状态管理"
-      subtasks:
-        - "设计会议状态机（准备中/录音中/处理中/已完成）"
-        - "实现状态持久化（SQLite/Redis）"
-        - "查询当前活跃会议接口"
-        - "服务重启后状态恢复"
-      deliverable: "支持查询'当前谁在开会'，服务重启不丢状态"
-
-    - id: "V1-002"
-      desc: "用户权限隔离"
-      subtasks:
-        - "接入灵犀用户体系（user_id）"
-        - "会议数据归属绑定"
-        - "权限校验（只能看自己的会议）"
-      deliverable: "多人使用互不干扰，数据隔离"
-
-    - id: "V1-003"
-      desc: "会议统计查询功能"
-      subtasks:
-        - "查询会议次数统计（按时间范围/关键词筛选）"
-        - "查询会议记录详情（议题、行动项、风险点等）"
-        - "实现 count_meetings() 接口"
-        - "实现 get_meeting_summary() 接口"
-      deliverable: "支持查询'开了几次会'、'有什么记录'等统计需求"
-
-    - id: "V1-004"
-      desc: "数据库持久化层（SQLite）"
-      subtasks:
-        - "设计 Meeting/ActionItem 表结构"
-        - "实现 SQLite 存储后端（可选切换）"
-        - "迁移现有 JSON 数据"
-        - "更新 query_meetings 支持 SQL 查询"
-        - "支持复杂统计查询（会议次数、行动项完成率等）"
-      deliverable: "save_meeting() 支持 storage='sqlite' 参数，解决 JSON 查询性能问题"
-
-    - id: "V1-005"
-      desc: "Handy 集成 - 基础链路验证"
-      subtasks:
-        - "测试 WebSocket 端到端流程"
-        - "验证中文路径/文件名处理"
-        - "处理并发会议场景"
-        - "Handy 转写流 → 会议纪要 Word 文档 全流程跑通"
-      deliverable: "Handy 实时流转写能正常保存为会议纪要"
-
-    - id: "V2-000"
-      desc: "【战略方向】Handy 实时转译增强"
-      subtasks:
-        - "实时转写显示：边说边出文字（利用 Handy 实时流）"
-        - "实时会议纪要草稿：会议进行中同步提取议题和结论"
-        - "增量式纪要生成：接收一段处理一段，非等会议结束"
-        - "会议结束自动精修：基于完整上下文优化纪要"
-      deliverable: "会议进行中即可看到实时转写和初步纪要，会议结束自动生成精修版"
-      note: "这是 Handy 集成的增强版，核心是利用 Handy 的实时流转写能力"
-
-  completed:
-    - id: "INIT-001"
-      desc: "按 LifeOS 协议初始化 L1 核心文档"
-      done: "2026-02-25"
-      notes: "git init 独立仓库，创建 PROJECT_CONTEXT/SESSION_STATE/CHANGELOG，排除 Handy/ 和 openclaw的skill/"
-
-    - id: "V0-001"
-      desc: "核心 Skill 接口"
-      done: "2026-02-20"
-      notes: "transcribe(), create_meeting_skeleton(), save_meeting()"
-
-    - id: "V0-002"
-      desc: "Word 文档生成"
-      done: "2026-02-21"
-      notes: "python-docx 格式排版，议题/行动项表格"
-
-    - id: "V0-003"
-      desc: "WebSocket 实时流"
-      done: "2026-02-23"
-      notes: "websocket_server.py 接收 Handy 转写数据"
-
-    - id: "V0-004"
-      desc: "行动项全局台账"
-      done: "2026-02-24"
-      notes: "action_registry.json 跨会议追踪"
+  constraints:
+    - "音频格式：直接存webm，转写时用临时文件给whisper"
+    - "不做实时转码，够用就行"
+    - "不分chunks/目录，调试看日志"
+    - "旧代码直接删，不留legacy"
+    
+  todo_next:
+    - "数据库扩展：新增transcripts/topics/action_items表"
+    - "meeting_skill新增：MeetingSessionManager + transcribe_bytes"
+    - "WebSocket改造：简化协议为start/chunk/end"
+    - "端到端测试：Python模拟音频流客户端"
+    - "删除旧代码：Handy相关脚本全删"
 
 # === 已知问题 ===
 issues:
-  open:
-    - id: "BUG-001"
-      desc: "规则引擎提取效果差（结论命中率0%，行动项噪音30%）"
-      severity: "medium"
-      workaround: "已弃用规则引擎，改由 AI 层负责语义理解"
-      notes: "_extract_topics_with_conclusion() 等函数标记弃用"
-
-    - id: "BUG-002"
-      desc: "Windows 中文路径 git add 报警告"
-      severity: "low"
-      workaround: "git add --ignore-errors"
-
+  open: []
   closed: []
 
 # === 待决策项 ===
-decisions_pending:
-  - id: "DEC-001"
-    question: "数据库选型：SQLite 还是保留 JSON 为主？"
-    options:
-      - "SQLite：支持复杂查询、事务、并发"
-      - "JSON：简单、可人工查看、无需迁移"
-    context: "当前是单用户工具，JSON 够用；但未来可能有多用户/查询需求"
-
-  - id: "DEC-002"
-    question: "是否保留 _extract_topics_with_conclusion 等弃用函数？"
-    options:
-      - "保留：作为 fallback，用户可选规则引擎"
-      - "删除：代码整洁，AI 层完全接管"
-    context: "当前代码已标记弃用，但未被调用"
+decisions_pending: []
 
 # === 快速参考 ===
 quickref:
@@ -236,29 +170,12 @@ quickref:
   project_context: "PROJECT_CONTEXT.md"
   tech_stack:
     core: "Python 3.11+"
+    backend: "FastAPI + SQLAlchemy(async)"
+    database: "SQLite(开发) + 瀚高HighGoDB(生产)"
     transcription: "faster-whisper (small model)"
     document: "python-docx"
-    websocket: "websockets"
-    storage: "JSON files (v0.x) / SQLite (v1.1+)"
+    websocket: "FastAPI WebSocket"
   test_dir: "test/"
-  test_scripts:
-    - "test_ai_vs_rule.py"
-    - "test_deepseek.py"
-    - "test_edge_cases.py"
-    - "test_query_update.py"
-    - "test_concurrent.py"
-
-# === 待确认事项 ===
-pending_confirmation:
-  - item: "架构定位"
-    desc: "从 Skill 升级为功能模块，用户直接交互"
-    with: "老大"
-    note: "确认声音流向、AI调用方式、前端职责"
-
-  - item: "实时转写链路"
-    desc: "WebSocket 长连接细节，数据推送频率"
-    with: "老大"
-    note: "确认技术实现方案"
 
 # === 首读流程 ===
 reading_order:
@@ -273,7 +190,3 @@ reading_order:
   - file: docs/SKILL.md
     status: on_demand
     purpose: "完整开发规格（实现时按需读对应章节）"
-
-  - file: docs/DOCUMENT_PROTOCOL.md
-    status: on_demand
-    purpose: "AI 协作规范"

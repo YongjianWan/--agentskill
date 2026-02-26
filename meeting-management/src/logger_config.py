@@ -145,7 +145,7 @@ def setup_logging(
     
     logging.info(f"Logging configured: level={log_level}, log_dir={log_dir}")
     
-    return Path(log_dir) if log_dir else None
+    return Path(log_dir) if log_dir else None  # type: ignore
 
 
 def get_logger(name: str, session_id: str = None, user_id: str = None) -> logging.Logger:

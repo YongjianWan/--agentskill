@@ -38,7 +38,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore")
 
@@ -341,7 +341,7 @@ def create_meeting_skeleton(
     
     # 创建空的 topics，AI 应填充
     # 可选：将原始分段作为参考信息（非结构化）
-    raw_discussion = [seg["text"] for seg in segments[:5]] if segments else ["无内容"]
+    _ = [seg["text"] for seg in segments[:5]] if segments else ["无内容"]  # 保留用于调试
     
     return Meeting(
         id=meeting_id,
@@ -483,8 +483,8 @@ def save_meeting(
     Returns:
         {"docx": "...", "json": "...", "audio_backup": "..."}
     """
-    from docx import Document
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx import Document  # noqa: F401
+    from docx.enum.text import WD_ALIGN_PARAGRAPH  # noqa: F401
     
     # 构建输出路径
     if create_version:
@@ -1012,7 +1012,7 @@ def _create_word_document(meeting: Meeting, docx_path: Path):
         doc.add_heading("五、附件", level=1)
         doc.add_paragraph(f"录音文件：{Path(meeting.audio_path).name}")
     
-    doc.save(docx_path)
+    doc.save(str(docx_path))
 
 
 def _find_meeting_dir(meeting_id: str, output_dir: str) -> Optional[Path]:

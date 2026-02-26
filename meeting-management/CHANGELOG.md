@@ -9,14 +9,149 @@ meta:
 
 ---
 
-## v1.0 (进行中 — 2026-02-25)
+## v1.1 (进行中 — 2026-02-26)
+
+**目标**：架构重构 — 抛弃Handy，浏览器直连自建转写后端
+
+**架构重构（重大调整 2026-02-26）**
+- [ ] **抛弃Handy，浏览器MediaRecorder直连后端**
+  - 旧架构：Handy(本地Whisper) → 后端只收文字
+  - 新架构：浏览器 → 后端收音频块 → 后端Whisper转写
+  - 原因：减少依赖，后端控制完整链路
+- [ ] **数据库扩展**：新增表支持音频流处理
+  - transcripts表：sequence, text, timestamp
+  - topics表：title, conclusion
+  - action_items表：content, assignee, due_date, status
+- [ ] **meeting_skill改造**：新增流式处理方法
+  - MeetingSessionManager：管理音频文件句柄
+  - transcribe_bytes(audio_bytes)：直接转写bytes
+  - generate_minutes_after_meeting(meeting_id)：会后全量生成
+- [ ] **WebSocket协议简化**：start/chunk/end三消息
+  - start：创建meeting，初始化audio.webm
+  - chunk：追加写入，每30秒触发转写
+  - end：关闭文件，全量转写，生成纪要，导出Word
+- [ ] **端到端测试**：Python模拟音频流客户端
+- [ ] **清理旧代码**：删除Handy相关脚本，不留legacy
+
+**技术决策（2026-02-26确认）**
+- 音频格式：直接存webm，转写时用临时文件给whisper
+- 转写触发：**按时间30秒一次**（块大小不固定，不按块数）
+- 纪要生成：**会后全量生成**（非实时增量，复杂度不值得）
+- 旧代码处理：**直接删除，不留legacy**（代码即负债）
+- 调试方式：**看日志**，不分chunks/目录（避免生产垃圾文件）
+
+---
+
+## v1.0 (2026-02-25完成)
 
 **目标**：从 Skill 升级为灵犀"帮我听"功能模块，完成基础闭环
 
-**架构重构**
+**架构重构（重大调整 2026-02-25）**
 - [x] 明确模块定位：灵犀"帮我听"声音模块 (2026-02-25)
 - [x] 确定架构原则：服务器处理、长连接、AI 驱动、前端纯展示 (2026-02-25)
 - [x] 规划演进路线：V1.0 基础闭环 → V1.5 实时增强 → V2.0 智能沉淀 (2026-02-25)
+- [x] **架构调整**：浏览器前端直连服务器（Handy不再编译前端）(2026-02-25)
+  - 新架构：浏览器(MediaRecorder) → WebSocket → 服务器(Whisper/AI)
+  - Handy角色：转为纯音频引擎，V1.5作为备选方案
+  - 原因：前端不能用Handy的界面，需要浏览器直连
+
+**后端API设计（已确认 2026-02-25）**
+- [x] REST API文档 (`docs/BACKEND_API.md`) (2026-02-25)
+  - 会议管理：创建/开始/暂停/结束/获取结果
+  - 文件上传：POST /upload/audio + 进度查询
+  - 历史查询：列表/详情/下载
+  - 统一响应格式：{code, data, message}
+- [x] WebSocket协议 (并入BACKEND_API.md) (2026-02-25)
+  - 上行：音频流(Base64)、控制指令
+  - 下行：transcript/topic/action_item/status/result
+  - 状态机：created → recording → paused → processing → completed
+- [x] 数据模型定义 (2026-02-25)
+  - Meeting: session_id, status, duration_ms等
+  - Minutes: topics, action_items, risks等
+  - 统一错误码规范
+- [x] **设计确认** (2026-02-25)
+  - 框架: FastAPI（现代、异步、自动生成文档）
+  - 上传限制: 100MB
+  - 音频格式: WebM/Opus → 后端转WAV给Whisper
+  - 实时延迟目标: <2秒
+  - AI纪要触发: 会议结束后立即触发(同步等待10-30秒)
+  - 数据库: SQLite（简单，单文件）
+
+**后端开发进度**
+
+---
+
+### Phase 1: REST API骨架 ✅ (2026-02-25完成)
+
+**已完成**:
+- [x] FastAPI应用搭建 + 自动Swagger文档
+- [x] 数据库双支持: SQLite(开发) + **瀚高HighGoDB**(生产)
+  - 环境变量切换: `DB_TYPE=sqlite|highgo`
+  - 瀚高: 端口5866、连接池、三权分立
+- [x] SQLAlchemy异步模型 + Pydantic数据模型
+- [x] REST API完整实现
+  - `meetings.py`: 会议CRUD、开始/暂停/恢复/结束、纪要查询
+  - `upload.py`: 文件上传、处理状态查询
+  - `system.py`: 健康检查
+- [x] 项目结构 + 环境变量配置(`.env.example`)
+
+**启动**:
+```bash
+cd src && uvicorn main:app --reload --port 8765
+# API文档: http://localhost:8765/docs
+```
+
+---
+
+### Phase 2: WebSocket + 实时转写 ✅ (2026-02-25完成)
+
+**目标**: WebSocket实时音频流 + 实时字幕推送
+
+**已完成**:
+- [x] WebSocket服务 (`/ws/meeting/{session_id}`) (2026-02-25)
+  - 连接管理、心跳检测、会话超时清理(60分钟)
+  - 音频流接收 (Base64解码)
+  - 消息大小限制 (1MB)
+- [x] 音频缓存合并策略 (2026-02-25)
+  - 前端发送音频片段 → 后端缓存
+  - 缓存限制: 50MB/1000片段，防内存溢出
+  - 触发条件: 3段 或 5秒 或 缓存满
+  - 转写结果推送前端
+- [x] Mock实时转写 (2026-02-25)
+  - 模拟Whisper逐段转写
+  - 可切换真实Whisper (USE_WHISPER=true)
+  - 60秒超时保护，超时数据回滚
+- [x] 实时字幕推送 (2026-02-25)
+  - `type: transcript` 下行消息
+  - 支持 `is_final` 中间结果/确定结果
+  - 状态推送: recording/paused/processing/completed
+- [x] 转写文本编辑保存 (2026-02-25)
+  - `PUT /meetings/{id}/transcript/{segment_id}` 单条编辑
+  - `PUT /meetings/{id}/transcript` 批量编辑
+  - 同步更新 WebSocket 会话
+
+**新增文件**:
+- `src/services/websocket_manager.py` - WebSocket连接管理器
+- `src/services/transcription_service.py` - Mock/Whisper转写服务
+- `src/api/websocket.py` - WebSocket端点处理
+- `test/test_websocket.py` - WebSocket功能测试
+- `test/test_websocket_edge_cases.py` - WebSocket边界测试(10场景)
+- `test/test_api_edge_cases.py` - API边界测试(8场景)
+- `docs/BOUNDARY_FIXES.md` - 边界修复记录
+
+---
+
+### Phase 3-6 后续规划
+- Phase 3: Whisper集成 + 真实转写
+- Phase 4: AI纪要生成（多风格模板）
+- Phase 5: 历史检索完善 + 导出功能
+- Phase 6: 测试 + 文档完善
+
+**前端SDK（已废弃，前端不管）** (2026-02-25)
+- [x] ~~录音模块 (`sdk/browser/audio-recorder.js`)~~ - 前端自己实现
+- [x] ~~WebSocket客户端 (`sdk/browser/meeting-client.js`)~~ - 前端自己实现
+- [x] ~~演示页面 (`sdk/browser/demo.html`)~~ - 前端自己实现
+- [x] ~~WebSocket服务器V2 (`scripts/websocket_server_v2.py`)~~ - 需重写为后端服务
 
 **严重问题修复** (2026-02-25)
 - [x] **AI 填充缺失**：接入 DeepSeek AI 替代规则引擎 (2026-02-25)
@@ -25,7 +160,7 @@ meta:
   - 新增 `ai_minutes_generator.py` 模块
   - `generate_minutes()` 现在默认使用 AI 生成
 - [x] **规则引擎弃用**：`_extract_topics_with_conclusion()` 等函数已弃用 (2026-02-25)
-- [ ] **无实时推送**：WebSocket 只接收 Handy 流，不推送给前端
+- [x] **无实时推送**：WebSocket 只接收 Handy 流，不推送给前端 → **已修复** (2026-02-25)
 
 **稳定化改进** (2026-02-25)
 - [x] **AI 生成增强**: 添加重试机制和边界处理 (2026-02-25)
@@ -112,14 +247,15 @@ meta:
 - [x] SESSION_STATE.yaml 创建 (2026-02-25)
 - [x] CHANGELOG.md 创建 (2026-02-25)
 - [x] 业务流程推演与缺口分析 (2026-02-25)
-- [ ] WebSocket 端到端集成测试
-- [ ] 实时转写链路验证（音频→服务器→字幕推送）
-- [ ] 会议纪要生成与存储
-- [ ] 历史查询接口（会议列表/详情/统计）
+- [x] WebSocket 端到端集成测试 (2026-02-25)
+- [x] 实时转写链路验证（音频→服务器→字幕推送）(2026-02-25)
+- [x] 会议纪要生成与存储 (2026-02-25)
+- [x] 历史查询接口（会议列表/详情/统计）(2026-02-25)
+- [x] 边界测试与修复 (2026-02-25)
 
 **技术债务**
-- [ ] 接入通义千问 API 替代规则引擎
-- [ ] 数据库持久化层（SQLite）
+- [x] 接入通义千问 API 替代规则引擎 → **已用 DeepSeek 替代** (2026-02-25)
+- [x] 数据库持久化层（SQLite）→ **已完成** (2026-02-25)
 - [ ] 删除 _extract_topics_with_conclusion 等弃用函数
 
 **架构决策**
