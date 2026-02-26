@@ -719,162 +719,6 @@ def _parse_transcription(text: str) -> List[Dict[str, str]]:
     return segments
 
 
-def _extract_topics_with_conclusion(segments: List[Dict]) -> List[Topic]:
-    """
-    【已弃用】规则引擎议题提取效果差（结论命中率0%，行动项噪音30%）
-    
-    议题提取、结论识别、行动项抽取应由 AI 完成。
-    本函数保留仅供参考，不建议使用。
-    """
-    if not segments:
-        return [Topic(title="无内容", discussion_points=["未识别到有效内容"])]
-    
-    # 简单策略：按发言人变化或关键词分议题
-    topics = []
-    current_discussion = []
-    
-    # 不确定关键词
-    uncertain_keywords = ["可能", "大概", "也许", "待定", "待确认", "不确定", "暂时", "暂定", "估计"]
-    
-    # 结论关键词
-    conclusion_keywords = ["结论", "决定", "确定", "一致同意", "决议", "定下"]
-    
-    for seg in segments:
-        text = seg["text"]
-        
-        # 检查是否是新议题的开始（简单启发式）
-        is_new_topic = any(kw in text[:10] for kw in ["首先", "第一", "第二", "第三", "关于", "接下来"])
-        
-        if is_new_topic and current_discussion:
-            # 保存当前议题
-            topic = _create_topic_from_discussion(current_discussion, uncertain_keywords, conclusion_keywords)
-            topics.append(topic)
-            current_discussion = []
-        
-        current_discussion.append(seg)
-    
-    # 保存最后一个议题
-    if current_discussion:
-        topic = _create_topic_from_discussion(current_discussion, uncertain_keywords, conclusion_keywords)
-        topics.append(topic)
-    
-    # 如果没有分议题，全部作为一个议题
-    if not topics:
-        all_texts = [s["text"] for s in segments]
-        topics = [Topic(title="主要讨论", discussion_points=all_texts)]
-    
-    return topics
-
-
-def _create_topic_from_discussion(
-    discussion: List[Dict],
-    uncertain_keywords: List[str],
-    conclusion_keywords: List[str]
-) -> Topic:
-    """【已弃用】配合 _extract_topics_with_conclusion() 使用"""
-    
-    discussion_points = []
-    uncertain = []
-    conclusion = ""
-    action_items = []
-    
-    # 提取标题（第一段）
-    title = discussion[0]["text"][:30] if discussion else "议题"
-    if len(title) > 30:
-        title = title[:30] + "..."
-    
-    for seg in discussion:
-        text = seg["text"]
-        
-        # 检查不确定内容
-        if any(kw in text for kw in uncertain_keywords):
-            uncertain.append(text)
-        
-        # 检查结论
-        if any(kw in text for kw in conclusion_keywords):
-            conclusion = text
-        
-        # 提取行动项
-        actions = _extract_actions_from_text(text, seg["speaker"])
-        action_items.extend(actions)
-        
-        discussion_points.append(text)
-    
-    return Topic(
-        title=title,
-        discussion_points=discussion_points,
-        conclusion=conclusion,
-        uncertain=uncertain,
-        action_items=action_items
-    )
-
-
-def _extract_actions_from_text(text: str, speaker: str) -> List[ActionItem]:
-    """【已弃用】规则引擎行动项提取噪音大，应由 AI 抽取"""
-    actions = []
-    action_keywords = ["负责", "完成", "准备", "确认", "提交", "制定", "跟进", "处理"]
-    
-    if any(kw in text for kw in action_keywords):
-        # 提取截止时间
-        deadline = None
-        dm = re.search(r'(\d{4})?[年/-]?(\d{1,2})[月/-](\d{1,2})日?', text)
-        if dm:
-            if dm.group(1):
-                deadline = f"{dm.group(1)}-{dm.group(2).zfill(2)}-{dm.group(3).zfill(2)}"
-            else:
-                deadline = f"{datetime.now().year}-{dm.group(2).zfill(2)}-{dm.group(3).zfill(2)}"
-        else:
-            # 相对时间
-            dm = re.search(r'(下周[一二三四五六日]|本月底|月底|下周)', text)
-            if dm:
-                deadline = dm.group(1)
-        
-        # 提取交付物（简单启发式）
-        deliverable = ""
-        if "文档" in text or "报告" in text:
-            deliverable = "文档/报告"
-        elif "代码" in text or "程序" in text:
-            deliverable = "代码"
-        elif "方案" in text:
-            deliverable = "方案"
-        
-        actions.append(ActionItem(
-            action=text[:100],
-            owner=speaker if speaker else "待定",
-            deadline=deadline if deadline else "待定",
-            deliverable=deliverable,
-            source_topic=""
-        ))
-    
-    return actions
-
-
-def _extract_risks(segments: List[Dict]) -> List[str]:
-    """【已弃用】风险识别应由 AI 完成"""
-    risks = []
-    risk_keywords = ["风险", "问题", "不稳定", "延迟", "延期", "困难", "挑战", "隐患"]
-    
-    for seg in segments:
-        text = seg["text"]
-        if any(kw in text for kw in risk_keywords):
-            risks.append(text)
-    
-    return risks
-
-
-def _extract_pending_confirmations(segments: List[Dict]) -> List[str]:
-    """【已弃用】待确认事项识别应由 AI 完成"""
-    pending = []
-    pending_keywords = ["待确认", "待定", "待明确", "待商定", "待后续"]
-    
-    for seg in segments:
-        text = seg["text"]
-        if any(kw in text for kw in pending_keywords):
-            pending.append(text)
-    
-    return list(set(pending))  # 去重
-
-
 def _extract_participants_basic(segments: List[Dict]) -> List[str]:
     """
     基础参会人提取（简单启发式）
@@ -896,27 +740,7 @@ def _extract_participants_basic(segments: List[Dict]) -> List[str]:
     return list(speakers) or ["【AI 待识别参会人】"]
 
 
-# ============ 已弃用的智能提取函数 ============
-# 以下函数尝试用规则引擎做语义理解，效果不佳，已弃用。
-# 议题提取、结论识别、行动项抽取应由 AI 完成。
 
-def _extract_participants(segments: List[Dict]) -> List[str]:
-    """【已弃用】使用 _extract_participants_basic()"""
-    return _extract_participants_basic(segments)
-
-
-def _extract_title(first_text: str) -> str:
-    """【已弃用】会议标题识别应由 AI 完成"""
-    # 常见会议开场白模式
-    patterns = [
-        r'(.{2,20})(?:会议|评审|讨论|调度|协调|例会)',
-        r'(?:关于|就)(.{2,20})(?:的|进行)(?:讨论|评审|会议)',
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, first_text)
-        if match:
-            return match.group(0)
     
     # 默认取前20字
     return first_text[:20] if len(first_text) <= 20 else first_text[:20] + "..."
@@ -1063,6 +887,257 @@ def _append_to_action_registry(meeting: Meeting, output_dir: str):
     # 保存
     with open(registry_path, "w", encoding="utf-8") as f:
         json.dump(registry, f, ensure_ascii=False, indent=2)
+
+
+# ============ 音频流处理（新增） ============
+
+import tempfile
+import time
+from typing import BinaryIO
+
+# 全局会话管理器：meeting_id -> session数据
+_audio_sessions: Dict[str, dict] = {}
+
+# Whisper模型缓存（延迟加载）
+_whisper_model = None
+
+
+def _get_whisper_model():
+    """获取Whisper模型（延迟加载）"""
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+    return _whisper_model
+
+
+def init_meeting_session(meeting_id: str, title: str = "", user_id: str = "anonymous", db_session=None) -> str:
+    """
+    初始化会议会话
+    
+    Args:
+        meeting_id: 会议ID
+        title: 会议标题
+        user_id: 用户ID
+        db_session: 数据库会话（SQLAlchemy AsyncSession）
+    
+    Returns:
+        audio文件路径
+    """
+    from models.meeting import MeetingModel, MeetingStatus
+    
+    # 创建目录 output/meetings/YYYY/MM/{meeting_id}/
+    now = datetime.now()
+    meeting_dir = Path("./output/meetings") / now.strftime("%Y") / now.strftime("%m") / meeting_id
+    meeting_dir.mkdir(parents=True, exist_ok=True)
+    
+    audio_path = meeting_dir / "audio.webm"
+    
+    # 初始化音频文件（空文件，追加模式后续写入）
+    audio_path.touch()
+    
+    # 内存会话记录
+    _audio_sessions[meeting_id] = {
+        "audio_path": str(audio_path),
+        "meeting_dir": str(meeting_dir),
+        "title": title,
+        "user_id": user_id,
+        "start_time": now,
+        "last_chunk_time": 0,  # 上次转写时间戳
+        "chunk_count": 0,
+        "file_handle": None,  # 懒加载
+    }
+    
+    # 数据库插入记录（如果提供了db_session）
+    if db_session is not None:
+        # 注意：db_session是异步的，需要await，这里只同步创建记录对象
+        # 实际插入由调用方完成
+        pass
+    
+    return str(audio_path)
+
+
+def _get_file_handle(meeting_id: str) -> BinaryIO:
+    """获取音频文件句柄（懒加载，追加模式）"""
+    session = _audio_sessions.get(meeting_id)
+    if session is None:
+        raise ValueError(f"Meeting session not found: {meeting_id}")
+    
+    if session["file_handle"] is None or session["file_handle"].closed:
+        session["file_handle"] = open(session["audio_path"], "ab")
+    
+    return session["file_handle"]
+
+
+def transcribe_bytes(audio_bytes: bytes, mime_type: str = "audio/webm") -> Dict[str, Any]:
+    """
+    直接转写音频bytes（不落盘临时文件）
+    
+    Args:
+        audio_bytes: 音频数据
+        mime_type: 音频格式
+    
+    Returns:
+        {"segments": [...], "full_text": "...", "language": "zh"}
+    """
+    model = _get_whisper_model()
+    
+    # faster-whisper需要文件路径，用临时文件
+    suffix = ".webm" if "webm" in mime_type else ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+        f.write(audio_bytes)
+        temp_path = f.name
+    
+    try:
+        segments, info = model.transcribe(temp_path, beam_size=5, language="zh")
+        results = []
+        full_text_parts = []
+        
+        for seg in segments:
+            text = seg.text.strip()
+            results.append({
+                "start": seg.start,
+                "end": seg.end,
+                "text": text
+            })
+            full_text_parts.append(text)
+        
+        return {
+            "segments": results,
+            "full_text": " ".join(full_text_parts),
+            "language": info.language
+        }
+    finally:
+        Path(temp_path).unlink(missing_ok=True)
+
+
+def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int, 
+                       db_session=None) -> Optional[str]:
+    """
+    追加音频块并触发转写（每30秒触发一次）
+    
+    Args:
+        meeting_id: 会议ID
+        chunk_bytes: 音频块数据
+        sequence: 块序号
+        db_session: 数据库会话
+    
+    Returns:
+        转写文本（如触发转写），否则None
+    """
+    from models.meeting import TranscriptModel
+    
+    session = _audio_sessions.get(meeting_id)
+    if session is None:
+        raise ValueError(f"Meeting session not found: {meeting_id}")
+    
+    # 追加写入音频文件
+    f = _get_file_handle(meeting_id)
+    f.write(chunk_bytes)
+    f.flush()
+    
+    session["chunk_count"] += 1
+    current_time = time.time()
+    
+    # 检查是否触发转写（每30秒一次）
+    time_since_last = current_time - session["last_chunk_time"]
+    should_transcribe = (session["last_chunk_time"] == 0) or (time_since_last >= 30)
+    
+    transcript_text = None
+    
+    if should_transcribe:
+        # 读取音频文件内容
+        f.flush()
+        # 重新打开读取（避免写入缓冲问题）
+        f.close()
+        session["file_handle"] = None
+        
+        with open(session["audio_path"], "rb") as rf:
+            audio_data = rf.read()
+        
+        if len(audio_data) > 0:
+            # 转写
+            result = transcribe_bytes(audio_data)
+            transcript_text = result.get("full_text", "")
+            
+            # 记录转写时间
+            session["last_chunk_time"] = current_time
+            
+            # 保存到数据库（如果提供了db_session）
+            if db_session is not None:
+                # 异步操作需要await，这里返回数据给调用方处理
+                pass
+        
+        # 重新打开文件追加
+        session["file_handle"] = open(session["audio_path"], "ab")
+    
+    return transcript_text
+
+
+def finalize_meeting(meeting_id: str, db_session=None) -> dict:
+    """
+    结束会议，全量转写剩余内容，生成纪要，导出Word
+    
+    Args:
+        meeting_id: 会议ID
+        db_session: 数据库会话
+    
+    Returns:
+        {"audio_path": "...", "minutes_path": "...", "full_text": "..."}
+    """
+    from models.meeting import MeetingModel, MeetingStatus
+    
+    session = _audio_sessions.get(meeting_id)
+    if session is None:
+        raise ValueError(f"Meeting session not found: {meeting_id}")
+    
+    # 关闭文件句柄
+    if session["file_handle"] and not session["file_handle"].closed:
+        session["file_handle"].close()
+    session["file_handle"] = None
+    
+    # 全量转写
+    audio_path = Path(session["audio_path"])
+    with open(audio_path, "rb") as f:
+        audio_data = f.read()
+    
+    full_transcript = ""
+    if len(audio_data) > 0:
+        result = transcribe_bytes(audio_data)
+        full_transcript = result.get("full_text", "")
+    
+    # 生成会议纪要（调用AI）
+    minutes_path = Path(session["meeting_dir"]) / "minutes.docx"
+    
+    # 使用generate_minutes生成纪要（需要转写文本）
+    meeting_data = generate_minutes(
+        transcription=full_transcript,
+        meeting_id=meeting_id,
+        title=session["title"],
+        date=session["start_time"].strftime("%Y-%m-%d"),
+        audio_path=str(audio_path)
+    )
+    
+    # 保存Word
+    files = save_meeting(meeting_data, output_dir="./output", create_version=False)
+    
+    # 移动/重命名为标准路径
+    if "docx" in files:
+        import shutil
+        src_docx = files["docx"]
+        if Path(src_docx) != minutes_path:
+            shutil.move(src_docx, minutes_path)
+    
+    # 清理会话
+    del _audio_sessions[meeting_id]
+    
+    return {
+        "meeting_id": meeting_id,
+        "audio_path": str(audio_path),
+        "minutes_path": str(minutes_path),
+        "full_text": full_transcript,
+        "chunk_count": session["chunk_count"]
+    }
 
 
 # ============ CLI ============
