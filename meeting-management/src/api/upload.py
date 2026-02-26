@@ -3,13 +3,11 @@
 处理录音文件上传
 """
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
-from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
@@ -26,8 +24,10 @@ ALLOWED_EXTENSIONS = {'.mp3', '.wav', '.m4a', '.webm', '.ogg', '.flac'}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 
-def get_file_extension(filename: str) -> str:
+def get_file_extension(filename: str | None) -> str:
     """获取文件扩展名"""
+    if filename is None:
+        return ""
     return Path(filename).suffix.lower()
 
 
@@ -54,7 +54,7 @@ async def upload_audio(
     - 上传后异步转写生成纪要
     """
     # 检查文件格式
-    ext = get_file_extension(file.filename)
+    ext = get_file_extension(file.filename)  # type: ignore
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,

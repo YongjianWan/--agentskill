@@ -107,7 +107,7 @@ async def get_meeting(
         "participants": meeting.participants or [],
         "location": meeting.location or "",
         "audio_path": meeting.audio_path,
-        "transcript_count": len(meeting.transcript_segments or [])
+        "transcript_count": len(meeting.transcript_segments or [])  # type: ignore
     })
 
 
@@ -125,11 +125,11 @@ async def start_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    if meeting.status not in [MeetingStatus.CREATED, MeetingStatus.PAUSED]:
+    if meeting.status not in [MeetingStatus.CREATED, MeetingStatus.PAUSED]:  # type: ignore
         raise HTTPException(status_code=409, detail=f"当前状态不允许开始: {meeting.status}")
     
-    meeting.status = MeetingStatus.RECORDING
-    if not meeting.start_time:
+    meeting.status = MeetingStatus.RECORDING  # type: ignore
+    if not meeting.start_time:  # type: ignore
         meeting.start_time = datetime.utcnow()  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     
@@ -159,10 +159,10 @@ async def pause_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    if meeting.status != MeetingStatus.RECORDING:
+    if meeting.status != MeetingStatus.RECORDING:  # type: ignore
         raise HTTPException(status_code=409, detail=f"当前状态不允许暂停: {meeting.status}")
     
-    meeting.status = MeetingStatus.PAUSED
+    meeting.status = MeetingStatus.PAUSED  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
@@ -190,10 +190,10 @@ async def resume_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    if meeting.status != MeetingStatus.PAUSED:
+    if meeting.status != MeetingStatus.PAUSED:  # type: ignore
         raise HTTPException(status_code=409, detail=f"当前状态不允许恢复: {meeting.status}")
     
-    meeting.status = MeetingStatus.RECORDING
+    meeting.status = MeetingStatus.RECORDING  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
