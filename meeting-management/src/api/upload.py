@@ -138,11 +138,11 @@ async def get_upload_status(
     progress = 0
     stage = meeting.status
     
-    if meeting.status == MeetingStatus.PROCESSING:
+    if meeting.status == MeetingStatus.PROCESSING:  # type: ignore
         # TODO: 根据实际处理阶段计算进度
         progress = 50  # 临时值
         stage = "transcribing"
-    elif meeting.status == MeetingStatus.COMPLETED:
+    elif meeting.status == MeetingStatus.COMPLETED:  # type: ignore
         progress = 100
         stage = "completed"
     
@@ -160,7 +160,7 @@ async def get_upload_status(
 @router.get("/meetings/{session_id}/download")
 async def download_meeting(
     session_id: str,
-    format: str = Query("docx", regex="^(docx|json)$"),
+    format: str = Query("docx", regex="^(docx|json)$"),  # type: ignore
     db: AsyncSession = Depends(get_db)
 ):
     """下载会议纪要"""
@@ -173,7 +173,7 @@ async def download_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    if meeting.status != MeetingStatus.COMPLETED:
+    if meeting.status != MeetingStatus.COMPLETED:  # type: ignore
         raise HTTPException(status_code=409, detail="会议纪要尚未生成完成")
     
     # TODO: Phase 4 - 生成DOCX/JSON文件并返回
