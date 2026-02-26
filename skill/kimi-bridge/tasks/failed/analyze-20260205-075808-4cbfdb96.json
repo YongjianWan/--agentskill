@@ -1,0 +1,16 @@
+{
+  "task_id": "analyze-20260205-075808-4cbfdb96",
+  "type": "analyze",
+  "instruction": "分析系统故障报告",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-05T07:58:08.190824",
+  "started_at": "2026-02-05T07:58:08.191693",
+  "completed_at": "2026-02-05T07:58:08.196357",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'",
+  "session_id": null
+}

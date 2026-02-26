@@ -1,0 +1,16 @@
+{
+  "task_id": "fix-arithmetic-bug-001",
+  "type": "file_edit",
+  "created_at": "2026-02-04T12:30:00Z",
+  "context": {
+    "working_dir": "/root/.openclaw/workspace",
+    "files": ["scripts/autonomous/autonomous-assessor.sh"]
+  },
+  "instruction": "修复 autonomous-assessor.sh 第202行的算术展开错误。\n\n当前代码:\n  pending_count=$((pending_count + count))\n\n问题: count 变量可能包含非数字字符，导致 syntax error\n\n修复要求:\n1. 在算术运算前验证 count 是数字\n2. 如果 count 不是数字，设为 0\n3. 使用安全的算术运算方式\n\n参考修复:\n  count=$((count + 0))  # 强制转换为数字\n  pending_count=$((pending_count + count))",
+  "constraints": {
+    "dry_run": false,
+    "max_tokens": 5000,
+    "timeout_seconds": 60
+  },
+  "expected_output": "修复后的代码片段 + 测试命令输出证明修复成功"
+}

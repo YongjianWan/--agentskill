@@ -1,0 +1,22 @@
+{
+  "task_id": "analyze-20260204-205104-f26e5c63",
+  "type": "analyze",
+  "instruction": "测试指令",
+  "working_dir": "/root/.openclaw/workspace/skills/kimi-bridge",
+  "files": [
+    "/tmp",
+    "false",
+    "temp-1770209464-2f119564",
+    "true",
+    "120"
+  ],
+  "dry_run": true,
+  "timeout": 120,
+  "created_at": "2026-02-04T20:51:04.895440",
+  "started_at": "2026-02-04T20:51:04.896424",
+  "completed_at": "2026-02-04T20:51:04.901066",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'",
+  "session_id": "temp-1770209464-2f119564"
+}

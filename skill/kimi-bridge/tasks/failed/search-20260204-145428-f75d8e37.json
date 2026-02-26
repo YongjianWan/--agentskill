@@ -1,0 +1,15 @@
+{
+  "task_id": "search-20260204-145428-f75d8e37",
+  "type": "search",
+  "instruction": "搜索包含'test'的所有.txt文件",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [],
+  "dry_run": false,
+  "timeout": 30,
+  "created_at": "2026-02-04T14:54:28.440390",
+  "started_at": "2026-02-04T14:54:28.440939",
+  "completed_at": "2026-02-04T14:54:28.443702",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'"
+}

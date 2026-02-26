@@ -1,12 +1,68 @@
 {
-  "include": ["src"],
-  "exclude": ["test", "__pycache__"],
+  "include": [
+    "src",
+    "test"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/venv",
+    "**/Handy*",
+    "**/output"
+  ],
+  "ignore": [
+    "**/migrations",
+    "**/alembic"
+  ],
+  "stubPath": "src/stubs",
+  "venv": "venv",
   "pythonVersion": "3.11",
   "pythonPlatform": "Windows",
-  "typeCheckingMode": "off",
-  "reportGeneralTypeIssues": "none",
-  "reportArgumentType": "none",
-  "reportAssignmentType": "none",
-  "reportOptionalMemberAccess": "none",
-  "reportAttributeAccessIssue": "none"
+  
+  // 类型检查严格度 - 使用basic模式，避免过多SQLAlchemy警告
+  "typeCheckingMode": "basic",
+  
+  // 诊断设置
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": "none",
+  "reportUnusedImport": "warning",
+  "reportUnusedVariable": "warning",
+  "reportUnusedFunction": "none",
+  "reportUnusedClass": "none",
+  "reportDuplicateImport": "warning",
+  "reportOptionalSubscript": "error",
+  "reportOptionalMemberAccess": "error",
+  "reportOptionalCall": "error",
+  "reportOptionalIterable": "error",
+  "reportOptionalContextManager": "error",
+  "reportOptionalOperand": "error",
+  "reportUntypedFunctionDecorator": "none",
+  "reportUntypedClassDecorator": "none",
+  "reportUntypedBaseClass": "none",
+  "reportUntypedNamedTuple": "warning",
+  "reportPrivateUsage": "none",
+  "reportPrivateImportUsage": "warning",
+  "reportConstantRedefinition": "none",
+  "reportIncompatibleMethodOverride": "none",
+  "reportIncompatibleVariableOverride": "none",
+  "reportOverlappingOverloads": "warning",
+  "reportMissingSuperCall": "none",
+  "reportUninitializedInstanceVariable": "none",
+  "reportInvalidStringEscapeSequence": "warning",
+  "reportUnknownParameterType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownLambdaType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownMemberType": "none",
+  "reportMissingTypeArgument": "none",
+  "reportInvalidTypeVarUse": "warning",
+  "reportCallInDefaultInitializer": "none",
+  "reportUnnecessaryIsInstance": "none",
+  "reportUnnecessaryCast": "none",
+  "reportUnnecessaryComparison": "none",
+  "reportAssertAlwaysTrue": "warning",
+  "reportSelfClsParameterName": "warning",
+  "reportImplicitStringConcatenation": "none",
+  "reportUndefinedVariable": "error",
+  "reportInvalidStubStatement": "error"
 }

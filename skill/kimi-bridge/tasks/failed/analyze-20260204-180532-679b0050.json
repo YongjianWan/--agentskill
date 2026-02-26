@@ -1,0 +1,15 @@
+{
+  "task_id": "analyze-20260204-180532-679b0050",
+  "type": "analyze",
+  "instruction": "列出当前目录文件",
+  "working_dir": "/tmp",
+  "files": [],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-04T18:05:32.016708",
+  "started_at": "2026-02-04T18:05:32.017571",
+  "completed_at": "2026-02-04T18:05:32.020425",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'"
+}

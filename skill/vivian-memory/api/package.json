@@ -1,0 +1,23 @@
+{
+  "name": "memory-api",
+  "version": "1.0.0",
+  "description": "Aiden's Personal Memory Infrastructure - Vector-based memory storage for AI assistants",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute memory-db --file=./schema.sql",
+    "db:studio": "wrangler d1 execute memory-db --local --command \"SELECT * FROM memories LIMIT 10\""
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "memory",
+    "vector-database",
+    "ai"
+  ],
+  "author": "Aiden",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

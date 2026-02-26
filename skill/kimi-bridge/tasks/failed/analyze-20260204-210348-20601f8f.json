@@ -1,0 +1,16 @@
+{
+  "task_id": "analyze-20260204-210348-20601f8f",
+  "type": "analyze",
+  "instruction": "测试指令",
+  "working_dir": "/tmp",
+  "files": [],
+  "dry_run": true,
+  "timeout": 120,
+  "created_at": "2026-02-04T21:03:48.292614",
+  "started_at": "2026-02-04T21:03:48.293164",
+  "completed_at": "2026-02-04T21:03:48.296150",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'",
+  "session_id": "temp-1770210228-21ef771b"
+}

@@ -1,0 +1,674 @@
+#!/bin/bash
+# AgentOS CLI (aos) - Full dashboard control for AI agents
+# Usage: aos <command> [subcommand] [args]
+
+set -e
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+CONFIG_FILE="${HOME}/.agentos-config.json"
+MESH_CONFIG="${HOME}/.agentos-mesh.json"
+
+# Load config
+load_config() {
+  if [ -f "$CONFIG_FILE" ]; then
+    API_URL=$(jq -r '.apiUrl // "http://178.156.216.106:3100"' "$CONFIG_FILE")
+    API_KEY=$(jq -r '.apiKey // empty' "$CONFIG_FILE")
+    AGENT_ID=$(jq -r '.agentId // empty' "$CONFIG_FILE")
+    TENANT_ID=$(jq -r '.tenantId // empty' "$CONFIG_FILE")
+  elif [ -f "$MESH_CONFIG" ]; then
+    # Fallback to mesh config
+    API_URL=$(jq -r '.apiUrl // "http://178.156.216.106:3100"' "$MESH_CONFIG")
+    API_KEY=$(jq -r '.apiKey // empty' "$MESH_CONFIG")
+    AGENT_ID=$(jq -r '.agentId // empty' "$MESH_CONFIG")
+  else
+    API_URL="${AGENTOS_URL:-http://178.156.216.106:3100}"
+    API_KEY="${AGENTOS_API_KEY:-}"
+    AGENT_ID="${AGENTOS_AGENT_ID:-}"
+  fi
+}
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+error() {
+  echo -e "${RED}Error: $1${NC}" >&2
+  exit 1
+}
+
+success() {
+  echo -e "${GREEN}✓ $1${NC}"
+}
+
+info() {
+  echo -e "${BLUE}$1${NC}"
+}
+
+check_config() {
+  if [ -z "$API_KEY" ]; then
+    error "API key not configured. Set up ~/.agentos-config.json or AGENTOS_API_KEY"
+  fi
+}
+
+api_get() {
+  local endpoint="$1"
+  curl -s -X GET \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    "${API_URL}${endpoint}"
+}
+
+api_post() {
+  local endpoint="$1"
+  local data="$2"
+  curl -s -X POST \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$data" \
+    "${API_URL}${endpoint}"
+}
+
+api_patch() {
+  local endpoint="$1"
+  local data="$2"
+  curl -s -X PATCH \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$data" \
+    "${API_URL}${endpoint}"
+}
+
+api_delete() {
+  local endpoint="$1"
+  curl -s -X DELETE \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    "${API_URL}${endpoint}"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Config Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_config() {
+  case "${1:-show}" in
+    show)
+      echo "AgentOS Configuration"
+      echo "─────────────────────"
+      echo "API URL:   $API_URL"
+      echo "API Key:   ${API_KEY:0:20}..."
+      echo "Agent ID:  $AGENT_ID"
+      echo "Tenant ID: $TENANT_ID"
+      echo "Config:    $CONFIG_FILE"
+      ;;
+    set)
+      local key="$2"
+      local value="$3"
+      if [ -z "$key" ] || [ -z "$value" ]; then
+        error "Usage: aos config set <key> <value>"
+      fi
+      if [ ! -f "$CONFIG_FILE" ]; then
+        echo '{}' > "$CONFIG_FILE"
+        chmod 600 "$CONFIG_FILE"  # Secure permissions - only user can read/write
+      fi
+      jq --arg k "$key" --arg v "$value" '.[$k] = $v' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
+      chmod 600 "${CONFIG_FILE}.tmp"
+      mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+      success "Set $key = $value"
+      ;;
+    *)
+      echo "Usage: aos config [show|set <key> <value>]"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Memory Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_memory() {
+  check_config
+  local subcmd="${1:-help}"
+  shift || true
+
+  case "$subcmd" in
+    put)
+      local path="$1"
+      local value="$2"
+      shift 2 || error "Usage: aos memory put <path> <json> [--searchable] [--importance N] [--tags t1,t2]"
+      
+      local searchable="false"
+      local importance="0"
+      local tags="[]"
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --searchable) searchable="true"; shift ;;
+          --importance) importance="$2"; shift 2 ;;
+          --tags) tags=$(echo "$2" | jq -R 'split(",")'); shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local payload=$(jq -n \
+        --arg agent_id "$AGENT_ID" \
+        --arg path "$path" \
+        --argjson value "$value" \
+        --argjson searchable "$searchable" \
+        --argjson importance "$importance" \
+        --argjson tags "$tags" \
+        '{agent_id: $agent_id, path: $path, value: $value, searchable: $searchable, importance: $importance, tags: $tags}')
+      
+      local result=$(api_post "/v1/put" "$payload")
+      if echo "$result" | jq -e '.ok' > /dev/null 2>&1; then
+        success "Stored at $path"
+      else
+        echo "$result" | jq .
+      fi
+      ;;
+      
+    get)
+      local path="$1"
+      [ -z "$path" ] && error "Usage: aos memory get <path>"
+      
+      local payload=$(jq -n --arg agent_id "$AGENT_ID" --arg path "$path" '{agent_id: $agent_id, path: $path}')
+      api_post "/v1/get" "$payload" | jq .
+      ;;
+      
+    delete)
+      local path="$1"
+      [ -z "$path" ] && error "Usage: aos memory delete <path>"
+      
+      local payload=$(jq -n --arg agent_id "$AGENT_ID" --arg path "$path" '{agent_id: $agent_id, path: $path}')
+      local result=$(api_post "/v1/delete" "$payload")
+      if echo "$result" | jq -e '.ok' > /dev/null 2>&1; then
+        success "Deleted $path"
+      else
+        echo "$result" | jq .
+      fi
+      ;;
+      
+    list)
+      local prefix="${1:-/}"
+      local payload=$(jq -n --arg agent_id "$AGENT_ID" --arg prefix "$prefix" '{agent_id: $agent_id, prefix: $prefix}')
+      api_post "/v1/list" "$payload" | jq -r '.items[]? | "\(.type)\t\(.path)"' 2>/dev/null || api_post "/v1/list" "$payload" | jq .
+      ;;
+      
+    search)
+      local query="$1"
+      local top_k="${2:-10}"
+      [ -z "$query" ] && error "Usage: aos memory search <query> [top_k]"
+      
+      local payload=$(jq -n --arg agent_id "$AGENT_ID" --arg query "$query" --argjson top_k "$top_k" '{agent_id: $agent_id, query: $query, top_k: $top_k}')
+      api_post "/v1/search" "$payload" | jq '.results[]? | {path, similarity, value}' 2>/dev/null || api_post "/v1/search" "$payload" | jq .
+      ;;
+      
+    history)
+      local path="$1"
+      local limit="${2:-10}"
+      [ -z "$path" ] && error "Usage: aos memory history <path> [limit]"
+      
+      local payload=$(jq -n --arg agent_id "$AGENT_ID" --arg path "$path" --argjson limit "$limit" '{agent_id: $agent_id, path: $path, limit: $limit}')
+      api_post "/v1/history" "$payload" | jq .
+      ;;
+      
+    *)
+      echo "Usage: aos memory <command>"
+      echo ""
+      echo "Commands:"
+      echo "  put <path> <json>     Store a memory"
+      echo "  get <path>            Read a memory"
+      echo "  delete <path>         Delete a memory"
+      echo "  list [prefix]         List memories"
+      echo "  search <query>        Semantic search"
+      echo "  history <path>        Version history"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_project() {
+  check_config
+  local subcmd="${1:-list}"
+  shift || true
+
+  case "$subcmd" in
+    list)
+      api_get "/v1/projects" | jq -r '.projects[]? | "\(.id)\t\(.status)\t\(.name)"' 2>/dev/null || api_get "/v1/projects" | jq .
+      ;;
+      
+    create)
+      local name="$1"
+      [ -z "$name" ] && error "Usage: aos project create <name> [--description text] [--status status]"
+      shift
+      
+      local description=""
+      local status="active"
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --description) description="$2"; shift 2 ;;
+          --status) status="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local payload=$(jq -n \
+        --arg name "$name" \
+        --arg description "$description" \
+        --arg status "$status" \
+        '{name: $name, description: $description, status: $status}')
+      
+      local result=$(api_post "/v1/projects" "$payload")
+      if echo "$result" | jq -e '.id' > /dev/null 2>&1; then
+        local id=$(echo "$result" | jq -r '.id')
+        success "Created project: $id"
+      else
+        echo "$result" | jq .
+      fi
+      ;;
+      
+    get)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos project get <id>"
+      api_get "/v1/projects/$id" | jq .
+      ;;
+      
+    update)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos project update <id> [--name name] [--status status] [--description text]"
+      shift
+      
+      local updates="{}"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name) updates=$(echo "$updates" | jq --arg v "$2" '. + {name: $v}'); shift 2 ;;
+          --status) updates=$(echo "$updates" | jq --arg v "$2" '. + {status: $v}'); shift 2 ;;
+          --description) updates=$(echo "$updates" | jq --arg v "$2" '. + {description: $v}'); shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local result=$(api_patch "/v1/projects/$id" "$updates")
+      success "Updated project $id"
+      ;;
+      
+    delete)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos project delete <id>"
+      api_delete "/v1/projects/$id"
+      success "Deleted project $id"
+      ;;
+      
+    *)
+      echo "Usage: aos project <command>"
+      echo ""
+      echo "Commands:"
+      echo "  list                  List all projects"
+      echo "  create <name>         Create a project"
+      echo "  get <id>              Get project details"
+      echo "  update <id>           Update a project"
+      echo "  delete <id>           Delete a project"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kanban Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_kanban() {
+  check_config
+  local subcmd="${1:-list}"
+  shift || true
+
+  case "$subcmd" in
+    list)
+      local project=""
+      local status=""
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          --status) status="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local endpoint="/v1/kanban"
+      local params=""
+      [ -n "$project" ] && params="${params}project_id=$project&"
+      [ -n "$status" ] && params="${params}status=$status&"
+      [ -n "$params" ] && endpoint="${endpoint}?${params%&}"
+      
+      api_get "$endpoint" | jq -r '.tasks[]? | "\(.id)\t\(.status)\t\(.priority)\t\(.title)"' 2>/dev/null || api_get "$endpoint" | jq .
+      ;;
+      
+    add)
+      local title="$1"
+      [ -z "$title" ] && error "Usage: aos kanban add <title> --project <id> [--status todo] [--priority medium]"
+      shift
+      
+      local project=""
+      local status="todo"
+      local priority="medium"
+      local description=""
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          --status) status="$2"; shift 2 ;;
+          --priority) priority="$2"; shift 2 ;;
+          --description) description="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      [ -z "$project" ] && error "Project ID required: --project <id>"
+      
+      local payload=$(jq -n \
+        --arg title "$title" \
+        --arg project_id "$project" \
+        --arg status "$status" \
+        --arg priority "$priority" \
+        --arg description "$description" \
+        '{title: $title, project_id: $project_id, status: $status, priority: $priority, description: $description}')
+      
+      local result=$(api_post "/v1/kanban" "$payload")
+      if echo "$result" | jq -e '.id' > /dev/null 2>&1; then
+        local id=$(echo "$result" | jq -r '.id')
+        success "Created task: $id"
+      else
+        echo "$result" | jq .
+      fi
+      ;;
+      
+    move|update)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos kanban move <id> <status>"
+      local new_status="$2"
+      [ -z "$new_status" ] && error "Usage: aos kanban move <id> <status>"
+      
+      local payload=$(jq -n --arg status "$new_status" '{status: $status}')
+      api_patch "/v1/kanban/$id" "$payload"
+      success "Moved task $id to $new_status"
+      ;;
+      
+    delete)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos kanban delete <id>"
+      api_delete "/v1/kanban/$id"
+      success "Deleted task $id"
+      ;;
+      
+    *)
+      echo "Usage: aos kanban <command>"
+      echo ""
+      echo "Commands:"
+      echo "  list                  List tasks"
+      echo "  add <title>           Add a task"
+      echo "  move <id> <status>    Move task to status"
+      echo "  update <id>           Update a task"
+      echo "  delete <id>           Delete a task"
+      echo ""
+      echo "Statuses: backlog, todo, in_progress, review, done"
+      echo "Priorities: low, medium, high, critical"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Brainstorm Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_brainstorm() {
+  check_config
+  local subcmd="${1:-list}"
+  shift || true
+
+  case "$subcmd" in
+    list)
+      local project=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local endpoint="/v1/brainstorms"
+      [ -n "$project" ] && endpoint="${endpoint}?project_id=$project"
+      
+      api_get "$endpoint" | jq -r '.brainstorms[]? | "\(.id)\t\(.type)\t\(.title)"' 2>/dev/null || api_get "$endpoint" | jq .
+      ;;
+      
+    add)
+      local title="$1"
+      [ -z "$title" ] && error "Usage: aos brainstorm add <title> --project <id> [--type idea] [--content text]"
+      shift
+      
+      local project=""
+      local type="idea"
+      local content=""
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          --type) type="$2"; shift 2 ;;
+          --content) content="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      [ -z "$project" ] && error "Project ID required: --project <id>"
+      
+      local payload=$(jq -n \
+        --arg title "$title" \
+        --arg project_id "$project" \
+        --arg type "$type" \
+        --arg content "$content" \
+        '{title: $title, project_id: $project_id, type: $type, content: $content}')
+      
+      local result=$(api_post "/v1/brainstorms" "$payload")
+      if echo "$result" | jq -e '.id' > /dev/null 2>&1; then
+        success "Created brainstorm: $(echo "$result" | jq -r '.id')"
+      else
+        echo "$result" | jq .
+      fi
+      ;;
+      
+    get)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos brainstorm get <id>"
+      api_get "/v1/brainstorms/$id" | jq .
+      ;;
+      
+    delete)
+      local id="$1"
+      [ -z "$id" ] && error "Usage: aos brainstorm delete <id>"
+      api_delete "/v1/brainstorms/$id"
+      success "Deleted brainstorm $id"
+      ;;
+      
+    *)
+      echo "Usage: aos brainstorm <command>"
+      echo ""
+      echo "Commands:"
+      echo "  list                  List brainstorms"
+      echo "  add <title>           Add a brainstorm"
+      echo "  get <id>              Get details"
+      echo "  delete <id>           Delete a brainstorm"
+      echo ""
+      echo "Types: idea, decision, learning, problem, solution"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_activity() {
+  check_config
+  local subcmd="${1:-list}"
+  shift || true
+
+  case "$subcmd" in
+    log)
+      local message="$1"
+      [ -z "$message" ] && error "Usage: aos activity log <message> [--project <id>]"
+      shift
+      
+      local project=""
+      local metadata="{}"
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          --metadata) metadata="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local payload=$(jq -n \
+        --arg agent_id "$AGENT_ID" \
+        --arg message "$message" \
+        --arg project_id "$project" \
+        --argjson metadata "$metadata" \
+        '{agent_id: $agent_id, message: $message, project_id: (if $project_id == "" then null else $project_id end), metadata: $metadata}')
+      
+      api_post "/v1/activity" "$payload" > /dev/null
+      success "Logged: $message"
+      ;;
+      
+    list)
+      local project=""
+      local limit="20"
+      
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --project) project="$2"; shift 2 ;;
+          --limit) limit="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      
+      local endpoint="/v1/activity?limit=$limit"
+      [ -n "$project" ] && endpoint="${endpoint}&project_id=$project"
+      
+      api_get "$endpoint" | jq -r '.activities[]? | "\(.created_at)\t\(.message)"' 2>/dev/null || api_get "$endpoint" | jq .
+      ;;
+      
+    *)
+      echo "Usage: aos activity <command>"
+      echo ""
+      echo "Commands:"
+      echo "  log <message>         Log an activity"
+      echo "  list                  List activities"
+      ;;
+  esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mesh Commands (wrapper for existing mesh CLI)
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_mesh() {
+  local mesh_cli="$(dirname "$0")/mesh"
+  if [ -x "$mesh_cli" ]; then
+    "$mesh_cli" "$@"
+  else
+    # Inline mesh commands
+    check_config
+    local subcmd="${1:-help}"
+    shift || true
+    
+    case "$subcmd" in
+      send)
+        local to="$1"
+        local topic="$2"
+        local body="$3"
+        [ -z "$to" ] || [ -z "$topic" ] || [ -z "$body" ] && error "Usage: aos mesh send <to> <topic> <body>"
+        
+        local payload=$(jq -n \
+          --arg from "$AGENT_ID" \
+          --arg to "$to" \
+          --arg topic "$topic" \
+          --arg body "$body" \
+          '{from_agent: $from, to_agent: $to, topic: $topic, body: $body}')
+        
+        api_post "/v1/mesh/messages" "$payload" > /dev/null
+        success "Message sent to $to"
+        ;;
+        
+      pending)
+        api_get "/v1/mesh/messages?direction=inbox&status=unread" | jq -r '.messages[]? | "[\(.from_agent)] \(.topic): \(.body | .[0:80])..."' 2>/dev/null || api_get "/v1/mesh/messages?direction=inbox" | jq .
+        ;;
+        
+      agents)
+        api_get "/v1/mesh/agents" | jq -r '.agents[]? | "\(.agent_id)\t\(.status)"' 2>/dev/null || api_get "/v1/mesh/agents" | jq .
+        ;;
+        
+      *)
+        echo "Usage: aos mesh <command>"
+        echo ""
+        echo "Commands:"
+        echo "  send <to> <topic> <body>  Send a message"
+        echo "  pending                    List pending messages"
+        echo "  agents                     List agents"
+        ;;
+    esac
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+
+usage() {
+  echo "AgentOS CLI - Dashboard control for AI agents"
+  echo ""
+  echo "Usage: aos <command> [args]"
+  echo ""
+  echo "Commands:"
+  echo "  config      Configuration management"
+  echo "  memory      Memory storage and retrieval"
+  echo "  project     Project management"
+  echo "  kanban      Kanban task management"
+  echo "  brainstorm  Brainstorm ideas and decisions"
+  echo "  activity    Activity logging"
+  echo "  mesh        Agent-to-agent messaging"
+  echo ""
+  echo "Run 'aos <command>' for command-specific help."
+  echo ""
+  echo "Documentation: aos reads AGENT-OPS.md for full guide"
+}
+
+# Load config
+load_config
+
+# Route command
+case "${1:-help}" in
+  config) shift; cmd_config "$@" ;;
+  memory) shift; cmd_memory "$@" ;;
+  project) shift; cmd_project "$@" ;;
+  kanban) shift; cmd_kanban "$@" ;;
+  brainstorm) shift; cmd_brainstorm "$@" ;;
+  activity) shift; cmd_activity "$@" ;;
+  mesh) shift; cmd_mesh "$@" ;;
+  help|--help|-h) usage ;;
+  *) error "Unknown command: $1. Run 'aos help' for usage." ;;
+esac

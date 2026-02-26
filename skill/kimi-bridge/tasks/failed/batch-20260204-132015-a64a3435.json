@@ -1,0 +1,15 @@
+{
+  "task_id": "batch-20260204-132015-a64a3435",
+  "type": "batch",
+  "instruction": "将所有.txt文件重命名为.md文件（仅预览，不实际修改）",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [],
+  "dry_run": true,
+  "timeout": 120,
+  "created_at": "2026-02-04T13:20:15.067772",
+  "started_at": "2026-02-04T13:20:15.068198",
+  "completed_at": null,
+  "status": "running",
+  "result": null,
+  "error": null
+}

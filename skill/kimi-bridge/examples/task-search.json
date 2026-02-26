@@ -1,0 +1,16 @@
+{
+  "task_id": "find-config-files-001",
+  "type": "search",
+  "created_at": "2026-02-04T12:40:00Z",
+  "context": {
+    "working_dir": "/root/.openclaw",
+    "files": []
+  },
+  "instruction": "搜索 workspace 目录下所有的配置文件。\n\n要求:\n1. 找出所有 .json, .yaml, .yml, .conf, .config 文件\n2. 按类型分组统计\n3. 显示每个配置文件的路径和大小\n4. 标记可能包含敏感信息（API key、密码）的文件",
+  "constraints": {
+    "dry_run": true,
+    "max_tokens": 5000,
+    "timeout_seconds": 60
+  },
+  "expected_output": "配置文件列表（按类型分组）+ 敏感文件标记"
+}

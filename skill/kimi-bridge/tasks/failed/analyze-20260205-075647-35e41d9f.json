@@ -1,0 +1,16 @@
+{
+  "task_id": "analyze-20260205-075647-35e41d9f",
+  "type": "analyze",
+  "instruction": "分析系统故障报告，找出用户未收到消息的原因，并提供解决方案",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-05T07:56:47.288732",
+  "started_at": "2026-02-05T07:56:47.289231",
+  "completed_at": "2026-02-05T07:56:47.291564",
+  "status": "failed",
+  "result": null,
+  "error": "自动执行失败: [Errno 2] No such file or directory: 'kimi'",
+  "session_id": null
+}

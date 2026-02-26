@@ -1,0 +1,17 @@
+{
+  "task_id": "file_edit-20260204-144825-430859fe",
+  "type": "file_edit",
+  "instruction": "读取 /etc/passwd",
+  "working_dir": "/etc",
+  "files": [
+    "/etc/passwd"
+  ],
+  "dry_run": false,
+  "timeout": 60,
+  "created_at": "2026-02-04T14:48:25.816112",
+  "started_at": null,
+  "completed_at": null,
+  "status": "pending",
+  "result": null,
+  "error": null
+}

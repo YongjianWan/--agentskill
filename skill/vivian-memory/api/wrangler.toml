@@ -1,0 +1,29 @@
+# wrangler.toml
+# Cloudflare Workers 配置
+
+name = "memory-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# D1 数据库绑定
+# 部署前需要先创建：wrangler d1 create memory-db
+# 然后把下面的 database_id 替换成实际值
+[[d1_databases]]
+binding = "DB"
+database_name = "memory-db"
+database_id = "46a15581-9727-4dcf-a5be-794a264836e8"
+
+# Vectorize 绑定
+# 部署前需要先创建：wrangler vectorize create memory-index --dimensions=1536 --metric=cosine
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "memory-index"
+
+# 环境变量（敏感信息用 secret）
+# wrangler secret put API_KEY
+# wrangler secret put OPENAI_KEY
+
+# 可选：自定义域名
+# routes = [
+#   { pattern = "memory.yourdomain.com", custom_domain = true }
+# ]

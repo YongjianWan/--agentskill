@@ -1,0 +1,16 @@
+{
+  "task_id": "analyze-error-logs-001",
+  "type": "analyze",
+  "created_at": "2026-02-04T12:35:00Z",
+  "context": {
+    "working_dir": "/var/log",
+    "files": ["syslog", "auth.log"]
+  },
+  "instruction": "分析最近的系统日志，找出所有 ERROR 级别的条目。\n\n要求:\n1. 统计 ERROR 出现的次数\n2. 找出最常见的错误类型\n3. 如果有重复错误，显示发生的时间点\n4. 给出可能的根因分析",
+  "constraints": {
+    "dry_run": true,
+    "max_tokens": 8000,
+    "timeout_seconds": 120
+  },
+  "expected_output": "错误统计表格 + 根因分析 + 建议的修复措施"
+}

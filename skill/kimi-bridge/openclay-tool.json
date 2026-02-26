@@ -1,0 +1,138 @@
+{
+  "name": "kimi-bridge",
+  "version": "2.1",
+  "description": "OpenClaw 调用 Kimi CLI 全自动执行文件操作（零人工介入，节省 90% token）",
+  "tools": [
+    {
+      "name": "execute",
+      "description": "全自动执行文件操作任务（编辑、分析、搜索、批量操作）。调用后 5-15 秒返回结果，无需人工介入。",
+      "entry": "bridge-cli.py execute",
+      "parameters": {
+        "type": {
+          "type": "string",
+          "enum": ["file_edit", "analyze", "search", "batch"],
+          "description": "任务类型: file_edit(编辑文件), analyze(分析内容), search(搜索文件), batch(批量操作)"
+        },
+        "instruction": {
+          "type": "string",
+          "description": "自然语言指令，描述具体要做什么。例如：'修复第10行语法错误'、'统计ERROR数量'"
+        },
+        "working_dir": {
+          "type": "string",
+          "default": ".",
+          "description": "工作目录，所有文件操作限制在此目录内"
+        },
+        "files": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "相关文件列表（可选），例如：[\"app.py\", \"config.json\"]"
+        },
+        "dry_run": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否仅预览不执行。用于验证任务意图是否正确"
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 120,
+          "description": "超时秒数，默认120秒。复杂任务可适当增加"
+        },
+        "auto": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用全自动模式。true=自动执行（默认），false=生成手动执行脚本"
+        },
+        "session_id": {
+          "type": "string",
+          "default": null,
+          "description": "OpenClaw Session ID，用于保持会话上下文。相同ID会自动加载历史任务"
+        }
+      },
+      "returns": {
+        "success": "boolean - 任务是否成功完成",
+        "task_id": "string - 任务唯一标识符",
+        "auto_executed": "boolean - 是否自动执行完成",
+        "execution_time": "number - 执行耗时（秒）",
+        "summary": "string - 执行摘要（1-2句话）",
+        "files_modified": "array - 被修改的文件列表",
+        "files_created": "array - 被创建的文件列表",
+        "files_deleted": "array - 被删除的文件列表",
+        "output": "string - 详细输出内容",
+        "error": "string - 错误信息（失败时）"
+      }
+    },
+    {
+      "name": "get_status",
+      "description": "查询任务当前状态",
+      "entry": "bridge-cli.py status",
+      "parameters": {
+        "task_id": {
+          "type": "string",
+          "description": "任务ID"
+        }
+      },
+      "returns": {
+        "success": "boolean",
+        "status": "string (pending|running|completed|failed)"
+      }
+    },
+    {
+      "name": "get_result",
+      "description": "获取已完成任务的结果",
+      "entry": "bridge-cli.py result",
+      "parameters": {
+        "task_id": {
+          "type": "string",
+          "description": "任务ID"
+        }
+      },
+      "returns": {
+        "success": "boolean",
+        "result": "object - 完整结果对象",
+        "error": "string"
+      }
+    },
+    {
+      "name": "list_pending",
+      "description": "列出所有待处理任务",
+      "entry": "bridge-cli.py list",
+      "parameters": {},
+      "returns": {
+        "success": "boolean",
+        "count": "integer",
+        "tasks": "array"
+      }
+    }
+  ],
+  "routing_hints": [
+    {
+      "pattern": "修复.*文件|编辑.*代码|修改.*配置|重构.*代码|更新.*脚本",
+      "tool": "execute",
+      "args": {"type": "file_edit"},
+      "priority": "high"
+    },
+    {
+      "pattern": "分析.*日志|检查.*文件|审查.*代码|查看.*内容|统计.*数量",
+      "tool": "execute",
+      "args": {"type": "analyze"},
+      "priority": "high"
+    },
+    {
+      "pattern": "搜索.*文件|查找.*模式|定位.*代码|找到.*文件|grep.*模式",
+      "tool": "execute",
+      "args": {"type": "search"},
+      "priority": "medium"
+    },
+    {
+      "pattern": "批量.*重命名|批量.*修改|批量.*处理|批量.*删除",
+      "tool": "execute",
+      "args": {"type": "batch"},
+      "priority": "medium"
+    }
+  ],
+  "cost_benefit": {
+    "token_savings": "~90%",
+    "latency": "5-15 seconds",
+    "manual_intervention": 0
+  }
+}

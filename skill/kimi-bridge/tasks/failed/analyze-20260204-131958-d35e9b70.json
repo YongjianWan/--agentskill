@@ -1,0 +1,17 @@
+{
+  "task_id": "analyze-20260204-131958-d35e9b70",
+  "type": "analyze",
+  "instruction": "分析日志文件，统计ERROR、WARNING、INFO的数量，并列出所有ERROR的具体内容",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [
+    "test-log.log"
+  ],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-04T13:19:58.668044",
+  "started_at": "2026-02-04T13:19:58.669086",
+  "completed_at": null,
+  "status": "running",
+  "result": null,
+  "error": null
+}

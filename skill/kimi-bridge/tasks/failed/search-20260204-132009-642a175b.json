@@ -1,0 +1,15 @@
+{
+  "task_id": "search-20260204-132009-642a175b",
+  "type": "search",
+  "instruction": "搜索包含'test'的所有.txt文件",
+  "working_dir": "/root/.openclaw/workspace",
+  "files": [],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-04T13:20:09.079698",
+  "started_at": "2026-02-04T13:20:09.080143",
+  "completed_at": null,
+  "status": "running",
+  "result": null,
+  "error": null
+}

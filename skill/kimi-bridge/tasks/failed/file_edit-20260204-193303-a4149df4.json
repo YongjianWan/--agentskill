@@ -1,0 +1,16 @@
+{
+  "task_id": "file_edit-20260204-193303-a4149df4",
+  "type": "file_edit",
+  "instruction": "编辑文件",
+  "working_dir": "/var/log",
+  "files": [],
+  "dry_run": false,
+  "timeout": 120,
+  "created_at": "2026-02-04T19:33:03.375976",
+  "started_at": null,
+  "completed_at": null,
+  "status": "pending",
+  "result": null,
+  "error": null,
+  "session_id": "test-continue-session"
+}
