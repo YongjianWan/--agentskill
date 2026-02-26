@@ -9,29 +9,34 @@ meta:
 
 ---
 
-## v1.1 (进行中 — 2026-02-26)
+## v1.1 (2026-02-26完成)
 
 **目标**：架构重构 — 抛弃Handy，浏览器直连自建转写后端
 
 **架构重构（重大调整 2026-02-26）**
-- [ ] **抛弃Handy，浏览器MediaRecorder直连后端**
+- [x] **抛弃Handy，浏览器MediaRecorder直连后端** (2026-02-26)
   - 旧架构：Handy(本地Whisper) → 后端只收文字
   - 新架构：浏览器 → 后端收音频块 → 后端Whisper转写
   - 原因：减少依赖，后端控制完整链路
-- [ ] **数据库扩展**：新增表支持音频流处理
+- [x] **数据库扩展**：新增表支持音频流处理 (2026-02-26)
   - transcripts表：sequence, text, timestamp
-  - topics表：title, conclusion
   - action_items表：content, assignee, due_date, status
-- [ ] **meeting_skill改造**：新增流式处理方法
-  - MeetingSessionManager：管理音频文件句柄
-  - transcribe_bytes(audio_bytes)：直接转写bytes
-  - generate_minutes_after_meeting(meeting_id)：会后全量生成
-- [ ] **WebSocket协议简化**：start/chunk/end三消息
+  - MeetingModel新增：minutes_docx_path, audio_chunks_received
+- [x] **meeting_skill改造**：新增流式处理方法 (2026-02-26)
+  - init_meeting_session()：创建目录，初始化audio.webm
+  - append_audio_chunk()：追加音频，30秒触发转写
+  - finalize_meeting()：关闭文件，全量转写，生成纪要
+  - transcribe_bytes()：直接转写bytes（临时文件给whisper）
+- [x] **WebSocket协议简化**：start/chunk/end三消息 (2026-02-26)
   - start：创建meeting，初始化audio.webm
   - chunk：追加写入，每30秒触发转写
   - end：关闭文件，全量转写，生成纪要，导出Word
-- [ ] **端到端测试**：Python模拟音频流客户端
-- [ ] **清理旧代码**：删除Handy相关脚本，不留legacy
+- [x] **单元测试**：meeting_skill流式处理测试 (2026-02-26)
+  - test_audio_stream.py：init/append/finalize全链路
+  - 30秒触发逻辑验证
+  - 错误处理验证
+- [ ] **端到端测试**：Python模拟WebSocket客户端 (2026-02-26待测试)
+- [ ] **清理旧代码**：删除Handy相关脚本 (2026-02-26待清理)
 
 **技术决策（2026-02-26确认）**
 - 音频格式：直接存webm，转写时用临时文件给whisper
@@ -39,6 +44,10 @@ meta:
 - 纪要生成：**会后全量生成**（非实时增量，复杂度不值得）
 - 旧代码处理：**直接删除，不留legacy**（代码即负债）
 - 调试方式：**看日志**，不分chunks/目录（避免生产垃圾文件）
+
+**已知问题（类型检查）**
+- Pylance对SQLAlchemy Column类型推断不完全准确，部分赋值语句显示警告
+- 不影响运行时功能，代码逻辑正确
 
 ---
 

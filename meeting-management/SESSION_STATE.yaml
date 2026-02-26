@@ -4,9 +4,9 @@
 
 meta:
   project: "meeting-management"
-  version: "1.0-beta"
+  version: "1.1-beta"
   updated: "2026-02-26"
-  session_count: 9
+  session_count: 10
 
 # === 系统状态 ===
 system:
@@ -29,7 +29,12 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active: []
+  active:
+    - id: "TEST-002"
+      desc: "【端到端测试】WebSocket全链路测试"
+      status: "in_progress"
+      start: "2026-02-26"
+      note: "启动服务，用test_websocket_new_protocol.py验证"
       
   completed:
     - id: "WS-001"
@@ -37,10 +42,41 @@ tasks:
       status: "completed"
       done: "2026-02-26"
       
-  next:
     - id: "DB-001"
       desc: "【数据库】扩展表结构支持音频流存储"
+      status: "completed"
+      done: "2026-02-26"
+      subtasks:
+        - "✓ meetings表新增：minutes_docx_path, audio_chunks_received"
+        - "✓ 新增transcripts表：sequence, text, timestamp_ms"
+        - "✓ 新增action_items表：content, assignee, due_date, status"
+        - "✓ topics继续用JSON存储（够用）"
+      
+    - id: "SKILL-001"
+      desc: "【meeting_skill】新增音频流处理方法"
+      status: "completed"
+      done: "2026-02-26"
+      subtasks:
+        - "✓ MeetingSessionManager类：管理音频文件句柄"
+        - "✓ transcribe_bytes(audio_bytes)：直接转写bytes"
+        - "✓ init_meeting_session()：初始化会议+创建audio.webm"
+        - "✓ append_audio_chunk()：追加音频+30秒触发转写"
+        - "✓ finalize_meeting()：结束会议+生成纪要+导出Word"
+      
+    - id: "TEST-001"
+      desc: "【单元测试】meeting_skill流式处理测试"
+      status: "completed"
+      done: "2026-02-26"
+      
+  next:
+    - id: "CLEAN-001"
+      desc: "【清理】删除旧Handy相关代码"
       status: "pending"
+      subtasks:
+        - "删除scripts/websocket_server.py（旧Handy版）"
+        - "删除scripts/websocket_server_v2.py"
+        - "删除Handy相关测试脚本"
+      note: "旧代码就是负债，直接删不留legacy"
       subtasks:
         - "meetings表新增：audio_path, minutes_path, status"
         - "新增transcripts表：sequence, text, timestamp"

@@ -7,15 +7,9 @@ import json
 import base64
 import asyncio
 from datetime import datetime
-from typing import Optional
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from logger_config import get_logger
-from database.connection import AsyncSessionLocal
-from models.meeting import MeetingModel, MeetingStatus
 from services.websocket_manager import websocket_manager
 
 logger = get_logger(__name__)
