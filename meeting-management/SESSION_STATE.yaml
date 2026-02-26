@@ -30,8 +30,8 @@ system:
 # === 当前任务 ===
 tasks:
   active:
-    - id: "ARCH-001"
-      desc: "架构重构：抛弃Handy，浏览器直连音频流转写"
+    - id: "WS-001"
+      desc: "【WebSocket】改造协议为start/chunk/end，对接音频流处理"
       status: "in_progress"
       start: "2026-02-26"
       
@@ -48,7 +48,8 @@ tasks:
       
     - id: "SKILL-001"
       desc: "【meeting_skill】新增音频流处理方法"
-      status: "pending"
+      status: "completed"
+      done: "2026-02-26"
       subtasks:
         - "MeetingSessionManager类：管理音频文件句柄"
         - "transcribe_bytes(audio_bytes)：直接转写bytes"

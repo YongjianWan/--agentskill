@@ -19,7 +19,6 @@ from models.meeting import (
     TranscriptSegment
 )
 from services.websocket_manager import websocket_manager
-from api.websocket import flush_remaining_audio
 
 router = APIRouter()
 
@@ -235,9 +234,6 @@ async def end_meeting(
     meeting.end_time = datetime.utcnow()  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
-    
-    # 刷新剩余音频缓存（转写）
-    await flush_remaining_audio(session_id)
     
     # TODO: Phase 4 - 触发AI纪要生成
     # asyncio.create_task(generate_minutes_task(session_id))
