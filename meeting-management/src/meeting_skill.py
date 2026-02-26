@@ -924,7 +924,7 @@ def init_meeting_session(meeting_id: str, title: str = "", user_id: str = "anony
     Returns:
         audio文件路径
     """
-    from models.meeting import MeetingModel, MeetingStatus
+    from src.models.meeting import MeetingModel, MeetingStatus
     
     # 创建目录 output/meetings/YYYY/MM/{meeting_id}/
     now = datetime.now()
@@ -946,6 +946,7 @@ def init_meeting_session(meeting_id: str, title: str = "", user_id: str = "anony
         "last_chunk_time": 0,  # 上次转写时间戳
         "chunk_count": 0,
         "file_handle": None,  # 懒加载
+        "transcript_parts": [],  # 转写结果片段，用于最终拼接
     }
     
     # 数据库插入记录（如果提供了db_session）
@@ -1025,7 +1026,7 @@ def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int,
     Returns:
         转写文本（如触发转写），否则None
     """
-    from models.meeting import TranscriptModel
+    from src.models.meeting import TranscriptModel
     
     session = _audio_sessions.get(meeting_id)
     if session is None:
@@ -1048,28 +1049,36 @@ def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int,
     if should_transcribe:
         # 读取音频文件内容
         f.flush()
-        # 重新打开读取（避免写入缓冲问题）
         f.close()
         session["file_handle"] = None
         
-        with open(session["audio_path"], "rb") as rf:
-            audio_data = rf.read()
-        
-        if len(audio_data) > 0:
-            # 转写
-            result = transcribe_bytes(audio_data)
-            transcript_text = result.get("full_text", "")
+        try:
+            with open(session["audio_path"], "rb") as rf:
+                audio_data = rf.read()
             
-            # 记录转写时间
-            session["last_chunk_time"] = current_time
-            
-            # 保存到数据库（如果提供了db_session）
-            if db_session is not None:
-                # 异步操作需要await，这里返回数据给调用方处理
-                pass
-        
-        # 重新打开文件追加
-        session["file_handle"] = open(session["audio_path"], "ab")
+            if len(audio_data) > 0:
+                try:
+                    # 转写
+                    result = transcribe_bytes(audio_data)
+                    transcript_text = result.get("full_text", "")
+                    
+                    # 记录转写结果
+                    if transcript_text:
+                        session["transcript_parts"].append(transcript_text)
+                except Exception as e:
+                    # 转写失败也要更新时间，避免短时间内重复触发
+                    print(f"[WARN] 转写失败: {e}")
+                
+                # 记录转写时间（无论成功与否，避免重复触发）
+                session["last_chunk_time"] = current_time
+                
+                # 保存到数据库（如果提供了db_session）
+                if db_session is not None:
+                    # 异步操作需要await，这里返回数据给调用方处理
+                    pass
+        finally:
+            # 重新打开文件追加（确保句柄不会泄漏）
+            session["file_handle"] = open(session["audio_path"], "ab")
     
     return transcript_text
 
@@ -1085,7 +1094,7 @@ def finalize_meeting(meeting_id: str, db_session=None) -> dict:
     Returns:
         {"audio_path": "...", "minutes_path": "...", "full_text": "..."}
     """
-    from models.meeting import MeetingModel, MeetingStatus
+    from src.models.meeting import MeetingModel, MeetingStatus
     
     session = _audio_sessions.get(meeting_id)
     if session is None:
@@ -1096,48 +1105,55 @@ def finalize_meeting(meeting_id: str, db_session=None) -> dict:
         session["file_handle"].close()
     session["file_handle"] = None
     
-    # 全量转写
     audio_path = Path(session["audio_path"])
-    with open(audio_path, "rb") as f:
-        audio_data = f.read()
+    chunk_count = session["chunk_count"]
+    transcript_parts = session["transcript_parts"]
     
-    full_transcript = ""
-    if len(audio_data) > 0:
-        result = transcribe_bytes(audio_data)
-        full_transcript = result.get("full_text", "")
-    
-    # 生成会议纪要（调用AI）
-    minutes_path = Path(session["meeting_dir"]) / "minutes.docx"
-    
-    # 使用generate_minutes生成纪要（需要转写文本）
-    meeting_data = generate_minutes(
-        transcription=full_transcript,
-        meeting_id=meeting_id,
-        title=session["title"],
-        date=session["start_time"].strftime("%Y-%m-%d"),
-        audio_path=str(audio_path)
-    )
-    
-    # 保存Word
-    files = save_meeting(meeting_data, output_dir="./output", create_version=False)
-    
-    # 移动/重命名为标准路径
-    if "docx" in files:
-        import shutil
-        src_docx = files["docx"]
-        if Path(src_docx) != minutes_path:
-            shutil.move(src_docx, minutes_path)
-    
-    # 清理会话
-    del _audio_sessions[meeting_id]
-    
-    return {
-        "meeting_id": meeting_id,
-        "audio_path": str(audio_path),
-        "minutes_path": str(minutes_path),
-        "full_text": full_transcript,
-        "chunk_count": session["chunk_count"]
-    }
+    try:
+        # 读取音频数据（备用）
+        with open(audio_path, "rb") as f:
+            audio_data = f.read()
+        
+        # 拼接历史转写结果
+        full_transcript = " ".join(transcript_parts)
+        
+        # 如果一次都没转写过（会议太短），才做一次全量转写
+        if not full_transcript and len(audio_data) > 0:
+            result = transcribe_bytes(audio_data)
+            full_transcript = result.get("full_text", "")
+        
+        # 生成会议纪要（调用AI）
+        minutes_path = Path(session["meeting_dir"]) / "minutes.docx"
+        
+        # 使用generate_minutes生成纪要（需要转写文本）
+        meeting_data = generate_minutes(
+            transcription=full_transcript,
+            meeting_id=meeting_id,
+            title=session["title"],
+            date=session["start_time"].strftime("%Y-%m-%d"),
+            audio_path=str(audio_path)
+        )
+        
+        # 保存Word
+        files = save_meeting(meeting_data, output_dir="./output", create_version=False)
+        
+        # 移动/重命名为标准路径
+        if "docx" in files:
+            import shutil
+            src_docx = files["docx"]
+            if Path(src_docx) != minutes_path:
+                shutil.move(src_docx, minutes_path)
+        
+        return {
+            "meeting_id": meeting_id,
+            "audio_path": str(audio_path),
+            "minutes_path": str(minutes_path),
+            "full_text": full_transcript,
+            "chunk_count": chunk_count
+        }
+    finally:
+        # 清理会话（无论成功与否都要清理）
+        del _audio_sessions[meeting_id]
 
 
 # ============ CLI ============
