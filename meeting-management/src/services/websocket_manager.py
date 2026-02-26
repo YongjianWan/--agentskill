@@ -341,6 +341,12 @@ class WebSocketManager:
                 "recoverable": recoverable
             })
     
+    async def send_custom_message(self, session_id: str, data: dict):
+        """发送自定义消息"""
+        session = self.sessions.get(session_id)
+        if session and session.is_active:
+            await session.send_json(data)
+    
     def get_active_sessions_count(self) -> int:
         """获取活跃会话数"""
         return sum(1 for s in self.sessions.values() if s.is_active)

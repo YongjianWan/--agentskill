@@ -37,7 +37,7 @@ async def handle_start_message(websocket: WebSocket, session_id: str, data: dict
         await websocket_manager.connect(session_id, user_id, websocket)
         
         # 发送 started 消息
-        await websocket.send_json({
+        await websocket_manager.send_custom_message(session_id, {
             "type": "started",
             "meeting_id": session_id,
             "audio_path": audio_path
@@ -89,7 +89,7 @@ async def handle_chunk_message(session_id: str, data: dict):
         
         # 如果有转写结果，推送客户端
         if transcript_text:
-            await websocket_manager.send_json(session_id, {
+            await websocket_manager.send_custom_message(session_id, {
                 "type": "transcript",
                 "text": transcript_text,
                 "sequence": seq,
@@ -122,7 +122,7 @@ async def handle_end_message(session_id: str):
         )
         
         # 发送 completed 消息
-        await websocket_manager.send_json(session_id, {
+        await websocket_manager.send_custom_message(session_id, {
             "type": "completed",
             "meeting_id": session_id,
             "full_text": result["full_text"],
