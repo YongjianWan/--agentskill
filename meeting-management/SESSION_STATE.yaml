@@ -7,15 +7,18 @@ meta:
   version: "1.1-beta"
   updated: "2026-02-26"
   session_count: 10
+  last_session_summary: |
+    本轮完成：
+    1. DB-001: 数据库扩展完成（新增transcripts/action_items表，扩展MeetingModel）
+    2. SKILL-001: 流式处理方法完成（init_meeting_session/append_audio_chunk/finalize_meeting）
+    3. WS-001: WebSocket协议改造完成（start/chunk/end新协议）
+    4. TEST-001: 单元测试完成（test_audio_stream.py全通过）
+    5. 添加VS Code配置和Pyright类型检查配置
 
 # === 系统状态 ===
 system:
   phase: "re-architecture"
   # re-architecture: 架构重构期（抛弃Handy，浏览器直连自建转写后端）
-  # stabilization: 功能基本可用，进入稳定化阶段
-  # architecture-revision: 架构重构期（从 Skill 升级为功能模块）
-  # day-N: 功能开发阶段
-  # maintenance: 维护阶段
 
   key_decisions:
     - "【架构定位】灵犀'帮我听'声音模块，后端独立服务"
@@ -34,126 +37,87 @@ tasks:
       desc: "【端到端测试】WebSocket全链路测试"
       status: "in_progress"
       start: "2026-02-26"
-      note: "启动服务，用test_websocket_new_protocol.py验证"
+      steps:
+        - "启动服务: cd src && uvicorn main:app --reload --port 8765"
+        - "运行测试: python test/test_websocket_new_protocol.py"
+        - "验证: start → chunk → end 全链路通"
+      note: "测试脚本已写好，需要启动服务后运行"
       
   completed:
     - id: "WS-001"
-      desc: "【WebSocket】改造协议为start/chunk/end，对接音频流处理"
+      desc: "【WebSocket】改造协议为start/chunk/end"
       status: "completed"
       done: "2026-02-26"
-      
-    - id: "DB-001"
-      desc: "【数据库】扩展表结构支持音频流存储"
-      status: "completed"
-      done: "2026-02-26"
-      subtasks:
-        - "✓ meetings表新增：minutes_docx_path, audio_chunks_received"
-        - "✓ 新增transcripts表：sequence, text, timestamp_ms"
-        - "✓ 新增action_items表：content, assignee, due_date, status"
-        - "✓ topics继续用JSON存储（够用）"
+      files:
+        - "src/api/websocket.py (重写)"
+        - "src/services/websocket_manager.py (新增send_custom_message)"
+      protocol:
+        - "上行: start/chunk/end"
+        - "下行: started/transcript/completed/error"
       
     - id: "SKILL-001"
-      desc: "【meeting_skill】新增音频流处理方法"
+      desc: "【meeting_skill】新增流式处理方法"
       status: "completed"
       done: "2026-02-26"
-      subtasks:
-        - "✓ MeetingSessionManager类：管理音频文件句柄"
-        - "✓ transcribe_bytes(audio_bytes)：直接转写bytes"
-        - "✓ init_meeting_session()：初始化会议+创建audio.webm"
-        - "✓ append_audio_chunk()：追加音频+30秒触发转写"
-        - "✓ finalize_meeting()：结束会议+生成纪要+导出Word"
+      methods:
+        - "init_meeting_session() - 初始化会议+创建audio.webm"
+        - "append_audio_chunk() - 追加音频+30秒触发转写"
+        - "finalize_meeting() - 结束会议+生成纪要+导出Word"
+        - "transcribe_bytes() - 直接转写bytes"
+      test: "test/test_audio_stream.py 通过"
+      
+    - id: "DB-001"
+      desc: "【数据库】扩展表结构"
+      status: "completed"
+      done: "2026-02-26"
+      changes:
+        - "MeetingModel: +minutes_docx_path, +audio_chunks_received"
+        - "新增 TranscriptModel 表"
+        - "新增 ActionItemModel 表"
       
     - id: "TEST-001"
-      desc: "【单元测试】meeting_skill流式处理测试"
+      desc: "【单元测试】meeting_skill流式处理"
       status: "completed"
       done: "2026-02-26"
+      coverage:
+        - "init/append/finalize全链路"
+        - "30秒触发逻辑"
+        - "错误处理"
       
   next:
     - id: "CLEAN-001"
       desc: "【清理】删除旧Handy相关代码"
       status: "pending"
-      subtasks:
-        - "删除scripts/websocket_server.py（旧Handy版）"
-        - "删除scripts/websocket_server_v2.py"
-        - "删除Handy相关测试脚本"
-      note: "旧代码就是负债，直接删不留legacy"
-      subtasks:
-        - "meetings表新增：audio_path, minutes_path, status"
-        - "新增transcripts表：sequence, text, timestamp"
-        - "新增topics表：title, conclusion"
-        - "新增action_items表：content, assignee, due_date, status"
-      note: "SQLite先用，保持SQLAlchemy兼容瀚高"
-      
-    - id: "SKILL-001"
-      desc: "【meeting_skill】新增音频流处理方法"
-      status: "completed"
-      done: "2026-02-26"
-      subtasks:
-        - "MeetingSessionManager类：管理音频文件句柄"
-        - "transcribe_bytes(audio_bytes)：直接转写bytes"
-        - "generate_minutes_after_meeting(meeting_id)：会后全量生成纪要"
-      note: "转写触发策略：按时间30秒一次"
-      
-    - id: "WS-001"
-      desc: "【WebSocket】简化协议，直接接收音频块"
-      status: "pending"
-      subtasks:
-        - "消息协议简化：start/chunk/end"
-        - "start：创建meeting，初始化audio.webm"
-        - "chunk：追加写入，每30秒触发转写"
-        - "end：关闭文件，全量转写剩余，生成纪要，导出Word"
-      note: "删除旧Handy相关代码"
-      
-    - id: "TEST-001"
-      desc: "【测试】端到端音频流测试"
-      status: "pending"
-      subtasks:
-        - "Python模拟客户端发送音频块"
-        - "验证全链路：上传→转写→存库→生成纪要→导出Word"
-      note: "测试脚本用mock音频数据"
-      
-    - id: "CLEAN-001"
-      desc: "【清理】删除旧Handy相关代码"
-      status: "pending"
-      subtasks:
-        - "删除scripts/websocket_server.py（旧Handy版）"
-        - "删除scripts/websocket_server_v2.py"
-        - "删除Handy相关测试脚本"
+      targets:
+        - "scripts/websocket_server.py（旧Handy版）"
+        - "scripts/websocket_server_v2.py"
+        - "Handy相关测试脚本"
       note: "旧代码就是负债，直接删不留legacy"
 
-  completed:
-    - id: "BACKEND-001"
-      desc: "【后端开发】Phase 1: REST API骨架"
-      done: "2026-02-25"
-      subtasks:
-        - "✅ REST API 骨架：会议CRUD（POST/GET /meetings）"
-        - "✅ 文件上传接口：POST /upload/audio"
-        - "✅ 数据库持久化：SQLAlchemy模型（SQLite+瀚高HighGoDB双支持）"
-        - "✅ 历史查询接口：GET /meetings 列表查询"
-      deliverable: "FastAPI框架 + REST API + 数据库模型"
-
-    - id: "BACKEND-002"
-      desc: "【后端开发】Phase 2: WebSocket + 实时转写"
-      done: "2026-02-25"
-      subtasks:
-        - "✅ WebSocket服务：音频流接收（/ws/meeting/{id}）"
-        - "✅ 音频缓存合并：片段缓存→合并→转写"
-        - "✅ Mock实时转写：模拟Whisper逐段转写"
-        - "✅ 实时字幕推送：transcript下行消息"
-        - "✅ 转写文本编辑：支持前端编辑后保存"
-      deliverable: "WebSocket实时音频流 + 实时字幕推送"
-      
-    - id: "STABLE-001"
-      desc: "稳定化现有功能，修复潜在 bug"
-      done: "2026-02-25"
-      notes: |
-        完成内容:
-        1. AI 生成: 添加重试机制(3次)、可配置超时、文本截断、详细日志
-        2. WebSocket: 会话超时清理(60分钟)、消息大小限制(1MB)、详细连接日志
-        3. 日志系统: 统一日志配置(logger_config.py)、文件日志、错误分离
-        4. 边界处理: 磁盘空间检查、安全文件写入、内存检查、文本验证
-        新增文件: src/logger_config.py, src/utils.py
-      deliverable: "AI 纪要生成功能稳定可用"
+# === 新会话必读 ===
+new_session_guide:
+  read_first:
+    - "PROJECT_CONTEXT.md - 项目概况和架构"
+    - "本文件(SESSION_STATE.yaml) - 当前任务状态"
+    
+  current_status: |
+    架构重构基本完成，核心功能已就绪：
+    - 数据库: 表结构已扩展，支持音频流存储
+    - meeting_skill: 流式处理方法已实现并测试通过
+    - WebSocket: 新协议(start/chunk/end)已实现
+    
+    下一步是端到端测试，验证全链路是否通畅。
+    
+  important_notes:
+    - "Pylance类型警告: SQLAlchemy Column相关警告是预期的，不影响运行"
+    - "类型检查模式: 已设为basic，误报已最小化"
+    - "测试: 先运行test_audio_stream.py确认单元测试通过，再跑WebSocket端到端"
+    
+  quick_commands:
+    - "启动服务: cd src && uvicorn main:app --reload --port 8765"
+    - "单元测试: python test/test_audio_stream.py"
+    - "WebSocket测试: python test/test_websocket_new_protocol.py"
+    - "API文档: http://localhost:8765/docs"
 
 # === 重构决策记录 ===
 rearchitecture:
@@ -186,21 +150,17 @@ rearchitecture:
     - "不做实时转码，够用就行"
     - "不分chunks/目录，调试看日志"
     - "旧代码直接删，不留legacy"
-    
-  todo_next:
-    - "数据库扩展：新增transcripts/topics/action_items表"
-    - "meeting_skill新增：MeetingSessionManager + transcribe_bytes"
-    - "WebSocket改造：简化协议为start/chunk/end"
-    - "端到端测试：Python模拟音频流客户端"
-    - "删除旧代码：Handy相关脚本全删"
 
 # === 已知问题 ===
 issues:
-  open: []
+  open:
+    - id: "PYLANCE-001"
+      desc: "Pylance对SQLAlchemy Column类型推断不完全准确"
+      severity: "low"
+      impact: "仅类型检查，不影响运行时"
+      workaround: "已配置为basic模式，误报最小化"
+      
   closed: []
-
-# === 待决策项 ===
-decisions_pending: []
 
 # === 快速参考 ===
 quickref:
@@ -215,6 +175,11 @@ quickref:
     document: "python-docx"
     websocket: "FastAPI WebSocket"
   test_dir: "test/"
+  key_files:
+    - "src/meeting_skill.py - 核心Skill实现"
+    - "src/api/websocket.py - WebSocket处理"
+    - "src/models/meeting.py - 数据模型"
+    - "src/services/websocket_manager.py - 连接管理"
 
 # === 首读流程 ===
 reading_order:

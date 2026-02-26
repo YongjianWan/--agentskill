@@ -3,8 +3,8 @@
 ```yaml
 meta:
   project: "meeting-management"
-  version: "0.9-beta"
-  updated: "2026-02-25"
+  version: "1.1-beta"
+  updated: "2026-02-26"
 ```
 
 ---
@@ -45,9 +45,20 @@ meta:
 - 旧代码处理：**直接删除，不留legacy**（代码即负债）
 - 调试方式：**看日志**，不分chunks/目录（避免生产垃圾文件）
 
+**开发环境配置（2026-02-26）**
+- [x] VS Code配置：.vscode/settings.json
+  - Pylance类型检查模式：basic（平衡严格度和实用性）
+  - SQLAlchemy相关警告降级为information
+  - 代码格式化、文件关联、搜索排除
+- [x] Pyright配置：pyrightconfig.json
+  - 类型检查模式：basic
+  - 包含src和test目录
+  - 各类诊断级别配置
+
 **已知问题（类型检查）**
 - Pylance对SQLAlchemy Column类型推断不完全准确，部分赋值语句显示警告
 - 不影响运行时功能，代码逻辑正确
+- 配置已优化，误报最小化
 
 ---
 
