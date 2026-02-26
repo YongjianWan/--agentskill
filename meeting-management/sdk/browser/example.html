@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会议管理 SDK - 对接示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .config-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .config-box h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #5a6fd6;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #c0392b;
+        }
+        
+        .status-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .status-box.recording {
+            background: #ffebee;
+            border-left-color: #f44336;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .transcript-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .transcript-box h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .transcript-content {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+        
+        .minutes-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+        
+        .minutes-box.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .log-box {
+            background: #212529;
+            color: #adb5bd;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-box .timestamp {
+            color: #6c757d;
+        }
+        
+        .log-box .success {
+            color: #28a745;
+        }
+        
+        .log-box .error {
+            color: #dc3545;
+        }
+        
+        .log-box .info {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ 会议管理 SDK 对接示例</h1>
+            <p>基于 MeetingClient.js 的完整演示</p>
+        </div>
+        
+        <div class="content">
+            <!-- 配置 -->
+            <div class="config-box">
+                <h3>⚙️ 服务器配置</h3>
+                <div class="form-group">
+                    <label>服务器地址</label>
+                    <input type="text" id="serverUrl" value="http://172.20.3.70:8765" placeholder="http://localhost:8765">
+                </div>
+                <div class="form-group">
+                    <label>用户ID</label>
+                    <input type="text" id="userId" value="user_demo" placeholder="user_001">
+                </div>
+                <div class="form-group">
+                    <label>会议标题</label>
+                    <input type="text" id="meetingTitle" value="产品评审会" placeholder="未命名会议">
+                </div>
+            </div>
+            
+            <!-- 状态 -->
+            <div class="status-box" id="statusBox">
+                <strong>状态：</strong><span id="statusText">就绪</span>
+            </div>
+            
+            <!-- 按钮 -->
+            <div class="btn-group">
+                <button class="btn btn-primary" id="startBtn" onclick="startMeeting()">
+                    🎙️ 开始会议
+                </button>
+                <button class="btn btn-danger" id="endBtn" onclick="endMeeting()" disabled>
+                    ⏹️ 结束会议
+                </button>
+            </div>
+            
+            <!-- 实时转写 -->
+            <div class="transcript-box">
+                <h3>📝 实时转写</h3>
+                <div class="transcript-content" id="transcriptContent">
+                    （会议开始后显示转写内容...）
+                </div>
+            </div>
+            
+            <!-- 会议纪要 -->
+            <div class="minutes-box" id="minutesBox">
+                <h3>📄 会议纪要</h3>
+                <div id="minutesContent"></div>
+            </div>
+            
+            <!-- 系统日志 -->
+            <div class="log-box" id="logBox">
+                <div>[系统] 页面加载完成，等待开始会议...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 SDK -->
+    <script src="meeting-client.js"></script>
+    <script>
+        let client = null;
+        let transcripts = [];
+        
+        function log(message, type = 'info') {
+            const logBox = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            logBox.innerHTML += `<div><span class="timestamp">[${time}]</span> <span class="${className}">${message}</span></div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+        
+        function updateStatus(text, recording = false) {
+            document.getElementById('statusText').textContent = text;
+            const statusBox = document.getElementById('statusBox');
+            if (recording) {
+                statusBox.classList.add('recording');
+            } else {
+                statusBox.classList.remove('recording');
+            }
+        }
+        
+        async function startMeeting() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const userId = document.getElementById('userId').value;
+            const title = document.getElementById('meetingTitle').value;
+            
+            // 创建客户端实例
+            client = new MeetingClient({
+                baseUrl: serverUrl,
+                userId: userId,
+                onTranscript: (text, sequence) => {
+                    log(`收到转写 #${sequence}: ${text.substring(0, 50)}...`, 'success');
+                    transcripts.push(text);
+                    document.getElementById('transcriptContent').textContent = transcripts.join('\n');
+                },
+                onCompleted: (data) => {
+                    log('会议完成！', 'success');
+                    updateStatus('会议已完成', false);
+                    showMinutes(data);
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('endBtn').disabled = true;
+                },
+                onError: (error) => {
+                    log(`错误: ${error.message || JSON.stringify(error)}`, 'error');
+                    updateStatus('出错了', false);
+                }
+            });
+            
+            try {
+                log('正在连接服务器...');
+                updateStatus('正在连接...');
+                
+                await client.startMeeting(title);
+                
+                log('会议开始成功！', 'success');
+                updateStatus('正在录音 🎙️', true);
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('endBtn').disabled = false;
+                transcripts = [];
+                document.getElementById('transcriptContent').textContent = '';
+                document.getElementById('minutesBox').classList.remove('show');
+                
+            } catch (error) {
+                log(`启动失败: ${error.message || error}`, 'error');
+                updateStatus('启动失败');
+            }
+        }
+        
+        function endMeeting() {
+            if (client) {
+                log('正在结束会议...');
+                client.endMeeting();
+                updateStatus('正在生成纪要...');
+                document.getElementById('endBtn').disabled = true;
+            }
+        }
+        
+        function showMinutes(data) {
+            const minutesBox = document.getElementById('minutesBox');
+            const minutesContent = document.getElementById('minutesContent');
+            
+            minutesContent.innerHTML = `
+                <p><strong>会议ID:</strong> ${data.meetingId}</p>
+                <p><strong>转写长度:</strong> ${data.fullText?.length || 0} 字符</p>
+                <p><strong>接收 chunks:</strong> ${data.chunkCount}</p>
+                <p><strong>纪要文件:</strong> ${data.minutesPath}</p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #ffeaa7;">
+                <p><strong>转写预览:</strong></p>
+                <p style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">
+                    ${data.fullText ? data.fullText.substring(0, 200) + '...' : '无内容'}
+                </p>
+            `;
+            
+            minutesBox.classList.add('show');
+        }
+        
+        // 页面加载日志
+        log('SDK 加载完成，等待开始会议...');
+    </script>
+</body>
+</html>

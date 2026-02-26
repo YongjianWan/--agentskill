@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Meeting Assistant - 会议助手（AI 智能体入口）
 
@@ -26,9 +27,29 @@ import argparse
 import sys
 import json
 import time
+
+# Windows 控制台编码设置（解决中文路径乱码问题）
+if sys.platform == "win32":
+    import io
+    # 设置标准输出/错误编码为 UTF-8
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    # 设置 Windows 控制台代码页为 UTF-8
+    try:
+        import subprocess
+        subprocess.run(["chcp", "65001"], shell=True, capture_output=True)
+    except Exception:
+        pass
+
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
+
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # 添加 src 到路径
 sys.path.insert(0, str(Path(__file__).parent / ".." / "src"))

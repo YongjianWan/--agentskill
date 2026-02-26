@@ -78,18 +78,28 @@ Handy客户端(本地Whisper) ──WebSocket──→ 后端只收文字
 |-------|------|------|----------|
 | Phase 1 | REST API骨架 | ✅ 完成 | FastAPI + 瀚高/双数据库 + 会议CRUD |
 | Phase 2 | WebSocket实时转写 | ✅ 完成 | 音频流接收 + 缓存合并 + 实时字幕 |
-| **Phase 3** | **架构重构：自建转写后端** | 🔄 **进行中** | **浏览器音频流 → Whisper → 纪要** |
-| Phase 4 | AI纪要生成 | ⏳ 待开始 | 会后全量生成 |
-| Phase 5 | 历史检索完善 | ⏳ 待开始 | 搜索、筛选、导出 |
-| Phase 6 | 测试文档 | ⏳ 待开始 | 完整测试 |
+| Phase 3 | 架构重构：自建转写后端 | ✅ 完成 | 浏览器音频流 → Whisper → 纪要 |
+| **Phase 3.5** | **功能补全+优化** | ✅ **完成** | **下载接口、搜索、AI模板增强** |
+| **Phase 4** | **AI纪要生成增强** | 🔄 **待开始** | **通义千问、多模板、流式预览** |
+| Phase 5 | 历史检索完善 | ⏳ 待开始 | 高级搜索、筛选、批量导出 |
+| Phase 6 | 测试文档 | ⏳ 待开始 | 完整测试套件、性能测试 |
 
-### 重构任务清单
+### Phase 3 重构任务清单 (已完成 ✅)
 
-1. **数据库扩展** - 新增transcripts/topics/action_items表
-2. **meeting_skill改造** - MeetingSessionManager + transcribe_bytes
-3. **WebSocket简化** - start/chunk/end协议，30秒触发转写
-4. **端到端测试** - Python模拟音频流客户端
-5. **清理旧代码** - 删除Handy相关脚本
+1. ✅ **数据库扩展** - 新增transcripts/topics/action_items表
+2. ✅ **meeting_skill改造** - MeetingSessionManager + transcribe_bytes
+3. ✅ **WebSocket简化** - start/chunk/end协议，30秒触发转写
+4. ✅ **端到端测试** - Python模拟音频流客户端
+5. ✅ **清理旧代码** - 删除Handy相关脚本
+
+### Phase 3.5 功能补全 (已完成 ✅)
+
+1. ✅ **会议纪要下载接口** - `GET /meetings/{id}/download?format=docx|json`
+2. ✅ **REST API 异步 AI 生成** - 结束会议后自动触发
+3. ✅ **会议列表搜索** - 日期范围 + 关键词搜索
+4. ✅ **噪声词过滤修复** - 实时转写+AI生成双重过滤
+5. ✅ **AI纪要模板增强** - 详细版/简洁版双模板
+6. ✅ **功能测试** - `test_api_functions.py` 7/7 通过
 
 ## 4. 关键文件
 

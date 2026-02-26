@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 End-to-End Test for Meeting Management Skill
 Tests: WebSocket Server + Transcription + Minutes Generation
@@ -14,6 +15,11 @@ import argparse
 import subprocess
 from pathlib import Path
 from datetime import datetime
+
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))

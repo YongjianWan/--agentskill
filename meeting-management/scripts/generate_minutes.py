@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Generate meeting minutes from transcription. (v2.0)
 
@@ -10,6 +11,7 @@ Output:
     actions_YYYYMMDD_HHMMSS.json - Action items
 """
 
+import sys
 import json
 import re
 import argparse
@@ -17,6 +19,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 from dataclasses import dataclass, field
+
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 try:
     from docx import Document

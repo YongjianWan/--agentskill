@@ -8,10 +8,10 @@ import sys
 import time
 from pathlib import Path
 
-# 添加src到路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# 添加src到路径（确保models等模块可导入）
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.meeting_skill import (
+from meeting_skill import (
     init_meeting_session,
     append_audio_chunk,
     finalize_meeting,

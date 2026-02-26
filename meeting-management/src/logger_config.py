@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 日志配置模块
 提供统一的日志配置和结构化日志支持
@@ -100,7 +101,13 @@ def setup_logging(
     
     # 控制台处理器
     if enable_console:
-        console_handler = logging.StreamHandler(sys.stdout)
+        # Windows 下强制使用 UTF-8 编码
+        if sys.platform == 'win32':
+            console_handler = logging.StreamHandler(
+                open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', closefd=False)
+            )
+        else:
+            console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(getattr(logging, log_level.upper()))
         console_formatter = logging.Formatter(CONSOLE_FORMAT, datefmt='%H:%M:%S')
         console_handler.setFormatter(console_formatter)

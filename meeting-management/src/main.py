@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Meeting Management Backend API
 FastAPI + WebSocket + SQLite/瀚高HighGoDB
@@ -15,6 +16,20 @@ FastAPI + WebSocket + SQLite/瀚高HighGoDB
 
 import sys
 import os
+
+# Windows 控制台编码设置（解决中文路径乱码问题）
+if sys.platform == "win32":
+    # 设置标准输出/错误编码为 UTF-8
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    # 设置 Windows 控制台代码页为 UTF-8
+    try:
+        import subprocess
+        subprocess.run(["chcp", "65001"], shell=True, capture_output=True)
+    except Exception:
+        pass
+
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -41,7 +56,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化数据库
     await init_db()
-    print("✅ Database initialized")
+    print("[OK] Database initialized")
     
     # 启动 WebSocket 管理器
     websocket_manager.start()
@@ -50,7 +65,7 @@ async def lifespan(app: FastAPI):
     
     # 关闭时清理
     websocket_manager.stop()
-    print("👋 Server shutting down")
+    print("[BYE] Server shutting down")
 
 
 app = FastAPI(

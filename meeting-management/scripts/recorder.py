@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Meeting Recorder - 会议录音模块
 支持：本地麦克风录音、分段保存、自动转写触发
@@ -23,6 +24,11 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Callable
+
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 try:
     import pyaudio

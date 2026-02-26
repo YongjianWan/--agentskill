@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Setup script for meeting-management skill.
 Installs required dependencies for local Whisper transcription.
@@ -6,6 +7,11 @@ Installs required dependencies for local Whisper transcription.
 
 import subprocess
 import sys
+
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 
 def run_command(cmd, description):

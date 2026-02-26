@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 AI 会议纪要生成器
 使用 DeepSeek API 替代规则引擎
@@ -30,36 +31,110 @@ MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "3"))  # 默认重试3次
 RETRY_DELAY = float(os.getenv("AI_RETRY_DELAY", "1.0"))  # 重试间隔秒数
 MAX_TEXT_LENGTH = int(os.getenv("AI_MAX_TEXT_LENGTH", "15000"))  # 最大文本长度
 
+# 噪声词过滤配置（从环境变量读取，逗号分隔）
+DEFAULT_NOISE_WORDS = "字幕by索兰娅,字幕,索兰娅,suolan,字幕制作"
+NOISE_WORDS = os.getenv("AI_NOISE_WORDS", DEFAULT_NOISE_WORDS).split(",")
+NOISE_WORDS = [w.strip() for w in NOISE_WORDS if w.strip()]
 
-SYSTEM_PROMPT = """你是一个专业的会议纪要助手。请根据会议转写文本生成结构化的会议纪要。
+
+# 详细版纪要提示词 - 包含更多细节
+DETAILED_SYSTEM_PROMPT = """你是一个专业的会议纪要撰写专家。请根据会议转写文本生成详细版的结构化会议纪要。
 
 输出格式必须是 JSON：
 {
-    "title": "会议标题（从内容中提取或总结）",
+    "title": "会议标题（从内容中准确提取）",
+    "participants": ["参会人列表（去重）"],
+    "summary": "会议整体概述（100-200字，概括会议目的、主要讨论内容和最终结论）",
+    "topics": [
+        {
+            "title": "议题标题（简洁明了，不超过20字）",
+            "discussion_points": [
+                "讨论要点1：详细记录关键观点、数据、对比分析",
+                "讨论要点2：记录重要问答环节和不同意见",
+                "讨论要点3：保留有价值的背景信息和上下文"
+            ],
+            "conclusion": "结论（详细描述达成的共识、决策结果，没有则留空，绝不编造）",
+            "uncertain": ["不确定内容1", "需要后续确认的事项"],
+            "action_items": [
+                {
+                    "action": "具体行动描述（明确做什么，避免模糊词汇）",
+                    "owner": "负责人（使用真实姓名）",
+                    "deadline": "截止日期（YYYY-MM-DD 或相对时间）",
+                    "deliverable": "交付物描述（明确产出物）"
+                }
+            ]
+        }
+    ],
+    "risks": ["风险点1（描述具体风险及影响）", "风险点2"],
+    "pending_confirmations": ["待确认事项1", "待确认事项2"],
+    "next_meeting": "下次会议安排（如有提及）"
+}
+
+详细版规则：
+1. 议题划分
+   - 按议程或主题自然划分，每个议题有明确边界
+   - 议题标题简洁但准确反映讨论内容
+
+2. 讨论要点（重点）
+   - 每个议题至少3-5条讨论要点（如有足够内容）
+   - 提取关键观点、数据、对比分析
+   - 记录重要的问答环节
+   - 保留不同意见和辩论过程
+   - 去除口语化表达但保留核心信息
+
+3. 结论
+   - 详细记录达成的共识和决策结果
+   - 包含决策依据（如有）
+   - 没有结论时留空，绝不编造
+
+4. 行动项
+   - 必须包含：做什么、谁来做、何时完成、交付物是什么
+   - 负责人使用参会人真实姓名
+   - 明确可验证的交付物标准
+   - 只提取真正的任务分配
+
+5. 风险点
+   - 识别影响项目进度或结果的具体风险
+   - 描述风险的影响程度
+   - 过滤误报
+
+6. 会议总结
+   - 100-200字概括会议整体情况
+   - 包含会议目的、主要成果、下步方向
+
+7. 不确定内容
+   - 记录信息不完整的内容
+   - 标记需要后续跟进的问题"""
+
+# 简洁版纪要提示词 - 快速概览
+CONCISE_SYSTEM_PROMPT = """你是一个高效的会议纪要助手。请根据会议转写文本生成简洁版的结构化会议纪要。
+
+输出格式必须是 JSON：
+{
+    "title": "会议标题",
     "participants": ["参会人列表"],
     "topics": [
         {
             "title": "议题标题",
-            "discussion_points": ["讨论要点1", "讨论要点2"],
-            "conclusion": "结论（如果没有则留空）",
+            "discussion_points": ["核心要点1", "核心要点2"],
+            "conclusion": "结论",
             "action_items": [
-                {"action": "具体行动描述", "owner": "负责人", "deadline": "截止日期或空字符串"}
+                {"action": "行动描述", "owner": "负责人", "deadline": "截止日期"}
             ]
         }
     ],
-    "risks": ["风险点1", "风险点2"],
-    "pending_confirmations": ["待确认事项"]
+    "risks": [],
+    "pending_confirmations": []
 }
 
-规则：
-1. 议题划分要合理，每个议题有明确边界
-2. 结论必须准确，不要编造，没有就留空
-3. 行动项必须包含：做什么、谁来做、何时完成
-   - 只提取真正的任务分配，不要提取自我介绍、进度汇报等
-   - deadline 格式：YYYY-MM-DD 或"下周三"等相对时间
-4. 风险点要真实存在，过滤误报（如"没问题"不是风险）
-5. 不确定的内容放入 pending_confirmations
-6. 参会人从发言人中提取，去重"""
+简洁版规则：
+1. 高度概括，去除冗余内容
+2. 每个议题最多3条讨论要点
+3. 只记录关键决策和行动项
+4. 全文阅读时间控制在2分钟内"""
+
+# 默认使用详细版
+SYSTEM_PROMPT = DETAILED_SYSTEM_PROMPT
 
 
 def validate_transcription(transcription: str) -> tuple[bool, str]:
@@ -111,6 +186,43 @@ def truncate_transcription(transcription: str, max_length: int = MAX_TEXT_LENGTH
     return f"{head}\n\n...[中间内容省略]...\n\n{tail}"
 
 
+def filter_noise_words(transcription: str, noise_words: Optional[List[str]] = None) -> str:
+    """
+    过滤转写文本中的噪声词（如字幕、背景音识别等）
+    
+    Args:
+        transcription: 原始转写文本
+        noise_words: 噪声词列表（默认使用环境变量配置的列表）
+        
+    Returns:
+        过滤后的文本
+    """
+    if not transcription:
+        return transcription
+    
+    words = noise_words if noise_words is not None else NOISE_WORDS
+    if not words:
+        return transcription
+    
+    filtered_text = transcription
+    removed_count = 0
+    
+    for word in words:
+        if word and word in filtered_text:
+            count = filtered_text.count(word)
+            filtered_text = filtered_text.replace(word, "")
+            removed_count += count
+            logger.debug(f"过滤噪声词 '{word}': 出现 {count} 次")
+    
+    # 清理多余空格
+    filtered_text = " ".join(filtered_text.split())
+    
+    if removed_count > 0:
+        logger.info(f"共过滤 {removed_count} 个噪声词，文本长度: {len(transcription)} -> {len(filtered_text)}")
+    
+    return filtered_text
+
+
 def generate_minutes_with_ai(
     transcription: str,
     title_hint: str = "",
@@ -118,7 +230,8 @@ def generate_minutes_with_ai(
     base_url: Optional[str] = None,
     model: Optional[str] = None,
     max_retries: int = MAX_RETRIES,
-    timeout: int = REQUEST_TIMEOUT
+    timeout: int = REQUEST_TIMEOUT,
+    detail_level: str = "detailed"
 ) -> Optional[Dict]:
     """
     使用 DeepSeek AI 生成会议纪要（带重试机制）
@@ -131,10 +244,16 @@ def generate_minutes_with_ai(
         model: 模型名称
         max_retries: 最大重试次数
         timeout: 请求超时时间（秒）
+        detail_level: 纪要详细程度，"detailed"(详细) 或 "concise"(简洁)
         
     Returns:
         会议纪要字典，失败返回 None
     """
+    # 选择提示词
+    if detail_level == "concise":
+        system_prompt = CONCISE_SYSTEM_PROMPT
+    else:
+        system_prompt = DETAILED_SYSTEM_PROMPT
     # 参数准备
     api_key = api_key or DEEPSEEK_API_KEY
     base_url = base_url or DEEPSEEK_BASE_URL
@@ -151,8 +270,11 @@ def generate_minutes_with_ai(
         logger.error(f"转写文本验证失败: {error_msg}")
         return fallback_to_rule_engine(transcription, error_msg)
     
+    # 过滤噪声词（字幕、背景音等）
+    filtered_text = filter_noise_words(transcription)
+    
     # 截断过长文本
-    processed_text = truncate_transcription(transcription)
+    processed_text = truncate_transcription(filtered_text)
     
     # 构建提示词
     user_prompt = f"会议转写文本：\n\n{processed_text}\n\n请生成会议纪要 JSON："
@@ -167,7 +289,7 @@ def generate_minutes_with_ai(
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         "temperature": 0.3,

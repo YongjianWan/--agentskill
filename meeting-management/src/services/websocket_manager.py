@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 WebSocket 连接管理器
 管理会议实时音频流连接
@@ -254,27 +255,21 @@ class WebSocketManager:
     
     async def connect(self, session_id: str, user_id: str, websocket: WebSocket) -> MeetingSession:
         """
-        建立 WebSocket 连接
+        建立 WebSocket 连接（假设已在外部 accept）
         
         流程：
         1. 获取或创建会话
         2. 关联 WebSocket
         3. 发送连接成功消息
         """
-        await websocket.accept()
-        
         session = self.get_or_create_session(session_id, user_id)
         session.websocket = websocket
         session.connected_at = datetime.utcnow()
         session.is_active = True
         session.update_activity()
         
-        # 发送连接成功消息
-        await session.send_json({
-            "type": "connected",
-            "session_id": session_id,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        # 注意：连接已由外部 accept，不发送 connected 消息
+        # 初始化成功后由调用方发送 started 消息
         
         logger.info(f"[{session_id}] WebSocket 已连接 (user: {user_id})")
         return session

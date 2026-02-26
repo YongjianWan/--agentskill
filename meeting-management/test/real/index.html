@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会议管理 - 真实流程测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            transition: background 0.3s;
+        }
+        
+        .status-dot.connected {
+            background: #28a745;
+        }
+        
+        .status-dot.recording {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-text {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 18px;
+            background: #667eea;
+            border-radius: 2px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #5a6fd6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .transcript-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .transcript-item {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .transcript-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 4px;
+        }
+        
+        .minutes-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+        
+        .minutes-box.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .minutes-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #856404;
+        }
+        
+        .minutes-content {
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        .log-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: #858585;
+        }
+        
+        .log-info { color: #4fc1ff; }
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-warn { color: #dcdcaa; }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ 会议管理 - 真实流程测试</h1>
+            <p>浏览器 MediaRecorder → WebSocket → Whisper → AI纪要</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">未连接</span>
+        </div>
+        
+        <div class="content">
+            <!-- 配置区域 -->
+            <div class="section">
+                <div class="section-title">连接配置</div>
+                <div class="input-group">
+                    <label>服务器地址</label>
+                    <input type="text" id="wsUrl" value="ws://localhost:8765/api/v1/ws/meeting/" placeholder="ws://localhost:8765/api/v1/ws/meeting/">
+                </div>
+                <div class="input-group">
+                    <label>会议标题</label>
+                    <input type="text" id="meetingTitle" value="测试会议" placeholder="输入会议标题">
+                </div>
+                <div class="input-group">
+                    <label>用户ID</label>
+                    <input type="text" id="userId" value="user_test" placeholder="输入用户ID">
+                </div>
+            </div>
+            
+            <!-- 控制按钮 -->
+            <div class="section">
+                <div class="section-title">会议控制</div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btnStart" onclick="startMeeting()">
+                        <span>⏺️</span> 开始会议
+                    </button>
+                    <button class="btn btn-danger" id="btnEnd" onclick="endMeeting()" disabled>
+                        <span>⏹️</span> 结束会议
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 统计 -->
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="statChunks">0</div>
+                    <div class="stat-label">已发送 chunks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statTranscripts">0</div>
+                    <div class="stat-label">转写片段</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statDuration">0s</div>
+                    <div class="stat-label">会议时长</div>
+                </div>
+            </div>
+            
+            <!-- 实时转写 -->
+            <div class="section">
+                <div class="section-title">实时转写</div>
+                <div class="transcript-box" id="transcriptBox">
+                    <div style="color: #999; text-align: center; padding: 40px 0;">
+                        等待会议开始...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 会议纪要 -->
+            <div class="section">
+                <div class="section-title">会议纪要</div>
+                <div class="minutes-box" id="minutesBox">
+                    <div class="minutes-title">📄 会议纪要</div>
+                    <div class="minutes-content" id="minutesContent">
+                        正在生成...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 日志 -->
+            <div class="section">
+                <div class="section-title">系统日志</div>
+                <div class="log-box" id="logBox">
+                    <div class="log-entry">
+                        <span class="log-time">[初始化]</span> 页面加载完成，等待开始会议...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        let ws = null;
+        let mediaRecorder = null;
+        let audioStream = null;
+        let sessionId = null;
+        let chunkCount = 0;
+        let transcriptCount = 0;
+        let startTime = null;
+        let isRecording = false;
+        
+        // ==================== 日志工具 ====================
+        function log(message, type = 'info') {
+            const logBox = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+        
+        // ==================== 状态更新 ====================
+        function updateStatus(status, text) {
+            const dot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            dot.className = 'status-dot';
+            if (status === 'connected') dot.classList.add('connected');
+            if (status === 'recording') dot.classList.add('recording');
+            
+            statusText.textContent = text;
+        }
+        
+        function updateStats() {
+            document.getElementById('statChunks').textContent = chunkCount;
+            document.getElementById('statTranscripts').textContent = transcriptCount;
+            if (startTime) {
+                const duration = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('statDuration').textContent = duration + 's';
+            }
+        }
+        
+        // ==================== 开始会议 ====================
+        async function startMeeting() {
+            try {
+                // 生成会话ID
+                sessionId = 'MT' + Date.now();
+                const userId = document.getElementById('userId').value || 'user_test';
+                const title = document.getElementById('meetingTitle').value || '测试会议';
+                
+                log(`开始创建会议: ${sessionId}`, 'info');
+                
+                // 构建 WebSocket URL
+                const baseUrl = document.getElementById('wsUrl').value.replace(/\/$/, '');
+                const wsUrl = `${baseUrl}/${sessionId}?user_id=${userId}`;
+                
+                log(`连接 WebSocket: ${wsUrl}`, 'info');
+                
+                // 连接 WebSocket
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    log('WebSocket 连接成功', 'success');
+                    updateStatus('connected', '已连接');
+                    
+                    // 发送 start 消息
+                    ws.send(JSON.stringify({
+                        type: 'start',
+                        title: title
+                    }));
+                    log(`发送 start 消息: ${title}`, 'info');
+                };
+                
+                ws.onmessage = async (event) => {
+                    const data = JSON.parse(event.data);
+                    log(`收到消息: ${data.type}`, 'success');
+                    
+                    switch (data.type) {
+                        case 'started':
+                            log(`会议已启动: ${data.meeting_id}`, 'success');
+                            // 开始录音
+                            await startRecording();
+                            break;
+                            
+                        case 'transcript':
+                            transcriptCount++;
+                            addTranscript(data.text);
+                            updateStats();
+                            break;
+                            
+                        case 'completed':
+                            handleCompleted(data);
+                            break;
+                            
+                        case 'error':
+                            log(`错误: ${data.message}`, 'error');
+                            break;
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    log('WebSocket 错误', 'error');
+                    console.error(error);
+                };
+                
+                ws.onclose = () => {
+                    log('WebSocket 连接关闭', 'warn');
+                    updateStatus('disconnected', '已断开');
+                    stopRecording();
+                };
+                
+                // 更新UI
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnEnd').disabled = false;
+                document.getElementById('stats').style.display = 'grid';
+                document.getElementById('transcriptBox').innerHTML = '';
+                document.getElementById('minutesBox').classList.remove('show');
+                
+            } catch (error) {
+                log(`启动失败: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+        
+        // ==================== 开始录音 ====================
+        async function startRecording() {
+            try {
+                log('请求麦克风权限...', 'info');
+                
+                audioStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 48000,
+                        channelCount: 2,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+                
+                log('麦克风权限获取成功', 'success');
+            } catch (err) {
+                // 权限被拒绝或获取失败
+                log(`麦克风权限获取失败: ${err.name} - ${err.message}`, 'error');
+                
+                // 恢复UI状态
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnEnd').disabled = true;
+                
+                // 提示用户
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    alert('麦克风权限被拒绝。请允许麦克风权限后重试。');
+                } else if (err.name === 'NotFoundError') {
+                    alert('未找到麦克风设备，请检查设备连接。');
+                } else {
+                    alert(`麦克风启动失败: ${err.message}`);
+                }
+                
+                // 断开WebSocket
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                
+                return; // 不再继续执行
+            }
+            
+            try {
+                // 权限获取成功后的逻辑继续...
+                
+                // 创建 MediaRecorder
+                const mimeType = 'audio/webm;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    log('浏览器不支持 webm/opus，尝试其他格式', 'warn');
+                }
+                
+                mediaRecorder = new MediaRecorder(audioStream, {
+                    mimeType: mimeType,
+                    audioBitsPerSecond: 128000
+                });
+                
+                log(`MediaRecorder 创建成功: ${mediaRecorder.mimeType}`, 'success');
+                
+                // 收集数据
+                mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                        try {
+                            // 转换为 base64
+                            const arrayBuffer = await event.data.arrayBuffer();
+                            const uint8Array = new Uint8Array(arrayBuffer);
+                            let binary = '';
+                            for (let i = 0; i < uint8Array.byteLength; i++) {
+                                binary += String.fromCharCode(uint8Array[i]);
+                            }
+                            const base64 = btoa(binary);
+                            
+                            // 发送 chunk
+                            ws.send(JSON.stringify({
+                                type: 'chunk',
+                                sequence: chunkCount,
+                                data: base64
+                            }));
+                            
+                            chunkCount++;
+                            if (chunkCount % 5 === 0) {
+                                log(`已发送 ${chunkCount} 个 chunks`, 'info');
+                            }
+                            updateStats();
+                            
+                        } catch (error) {
+                            log(`发送 chunk 失败: ${error.message}`, 'error');
+                        }
+                    }
+                };
+                
+                // 开始录制，每 1 秒产生一个 chunk
+                mediaRecorder.start(1000);
+                startTime = Date.now();
+                isRecording = true;
+                
+                log('开始录音！请说话...', 'success');
+                updateStatus('recording', '录音中');
+                
+                // 定时更新时长
+                window.durationInterval = setInterval(updateStats, 1000);
+                
+            } catch (error) {
+                log(`录音启动失败: ${error.message}`, 'error');
+                console.error(error);
+                
+                // 恢复UI状态
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnEnd').disabled = true;
+                
+                // 清理资源
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                    audioStream = null;
+                }
+            }
+        }
+        
+        // ==================== 添加转写文本 ====================
+        function addTranscript(text) {
+            const box = document.getElementById('transcriptBox');
+            
+            // 移除空状态
+            if (box.children.length === 1 && box.children[0].style.color === 'rgb(153, 153, 153)') {
+                box.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'transcript-item';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            item.innerHTML = `
+                <div class="transcript-time">${time}</div>
+                <div>${text}</div>
+            `;
+            box.appendChild(item);
+            box.scrollTop = box.scrollHeight;
+        }
+        
+        // ==================== 结束会议 ====================
+        async function endMeeting() {
+            try {
+                log('正在结束会议...', 'info');
+                
+                // 停止录音
+                stopRecording();
+                
+                // 发送 end 消息
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'end' }));
+                    log('发送 end 消息', 'info');
+                }
+                
+                // 更新UI
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnEnd').disabled = true;
+                
+            } catch (error) {
+                log(`结束失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // ==================== 停止录音 ====================
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                log('录音已停止', 'warn');
+            }
+            
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            
+            if (window.durationInterval) {
+                clearInterval(window.durationInterval);
+            }
+            
+            isRecording = false;
+            updateStatus('connected', '已连接');
+        }
+        
+        // ==================== 处理完成 ====================
+        function handleCompleted(data) {
+            log('会议已完成！', 'success');
+            
+            const minutesBox = document.getElementById('minutesBox');
+            const minutesContent = document.getElementById('minutesContent');
+            
+            minutesContent.innerHTML = `
+                <p><strong>会议ID:</strong> ${data.meeting_id}</p>
+                <p><strong>转写长度:</strong> ${data.full_text ? data.full_text.length : 0} 字符</p>
+                <p><strong>接收 chunks:</strong> ${data.chunk_count}</p>
+                <p><strong>纪要文件:</strong> ${data.minutes_path}</p>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #ffeaa7;">
+                <p><strong>转写预览:</strong></p>
+                <p style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">
+                    ${data.full_text ? data.full_text.substring(0, 200) : '无内容'}...
+                </p>
+            `;
+            
+            minutesBox.classList.add('show');
+            
+            // 关闭 WebSocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        // ==================== 页面加载完成 ====================
+        log('页面加载完成，等待开始会议...', 'info');
+    </script>
+</body>
+</html>

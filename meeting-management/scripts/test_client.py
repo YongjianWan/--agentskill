@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Test client for WebSocket server.
 Simulates Handy sending transcription data.

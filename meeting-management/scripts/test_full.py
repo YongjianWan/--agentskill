@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Full integration test for meeting management skill.
 Starts WebSocket server, sends test data, generates minutes.

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 数据库连接管理
 支持: SQLite(开发) / 瀚高HighGoDB(生产)

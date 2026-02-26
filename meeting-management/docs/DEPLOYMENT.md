@@ -1,8 +1,10 @@
 # 会议管理系统 - 服务器部署文档
 
 > 灵犀第二大脑 - "帮我听" 声音模块
-> 版本: v0.9-beta
-> 更新日期: 2026-02-25
+> 版本: v1.1-beta
+> 更新日期: 2026-02-26
+>
+> **架构变更**: 已抛弃 Handy，浏览器直连后端 WebSocket
 
 ---
 
@@ -241,8 +243,15 @@ mkdir -p output/logs
 **开发模式（前台运行）：**
 
 ```bash
-cd scripts
-python websocket_server.py --host 0.0.0.0 --port 8765
+cd src
+python -m uvicorn main:app --reload --port 8765
+```
+
+**局域网模式（允许外部访问）：**
+
+```bash
+cd src
+python -m uvicorn main:app --host 0.0.0.0 --port 8765
 ```
 
 **生产模式（后台运行）：**
@@ -253,16 +262,16 @@ Linux (systemd):
 # 创建服务文件
 sudo tee /etc/systemd/system/meeting-server.service << 'EOF'
 [Unit]
-Description=Meeting Management WebSocket Server
+Description=Meeting Management Backend Server
 After=network.target
 
 [Service]
 Type=simple
 User=meeting
-WorkingDirectory=/opt/meeting-management/scripts
+WorkingDirectory=/opt/meeting-management/src
 Environment=PYTHONPATH=/opt/meeting-management/src
 EnvironmentFile=/opt/meeting-management/.env
-ExecStart=/opt/meeting-management/venv/bin/python websocket_server.py
+ExecStart=/opt/meeting-management/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8765
 Restart=always
 RestartSec=5
 
@@ -287,8 +296,8 @@ Windows (NSSM):
 # 2. 创建服务
 nssm install MeetingServer "C:\Apps\meeting-management\venv\Scripts\python.exe"
 nssm set MeetingServer Application "C:\Apps\meeting-management\venv\Scripts\python.exe"
-nssm set MeetingServer Arguments "websocket_server.py"
-nssm set MeetingServer AppDirectory "C:\Apps\meeting-management\scripts"
+nssm set MeetingServer Arguments "-m uvicorn main:app --host 0.0.0.0 --port 8765"
+nssm set MeetingServer AppDirectory "C:\Apps\meeting-management\src"
 nssm set MeetingServer AppEnvironmentExtra "PYTHONPATH=C:\Apps\meeting-management\src"
 nssm start MeetingServer
 ```
@@ -304,76 +313,189 @@ nssm stop MeetingServer
 
 # 或直接查找进程杀死
 # Linux
-pkill -f websocket_server.py
+pkill -f "uvicorn"
 
 # Windows
-Get-Process python | Where-Object {$_.CommandLine -like "*websocket_server*"} | Stop-Process
+Get-Process python | Where-Object {$_.CommandLine -like "*uvicorn*"} | Stop-Process
 ```
 
 ---
 
-## 六、验证测试
+## 六、局域网部署（供前端/同事对接）
 
-### 6.1 健康检查
+### 6.1 Windows 防火墙设置
+
+以管理员运行 PowerShell：
+
+```powershell
+# 开放 8765 端口
+New-NetFirewallRule -DisplayName "Meeting Backend" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow
+
+# 查看本机 IP 地址
+Get-NetIPAddress | Where-Object {$_.AddressFamily -eq "IPv4" -and $_.IPAddress -notlike "127.*"} | Select-Object IPAddress
+```
+
+### 6.2 启动局域网服务
+
+```bash
+cd src
+python -m uvicorn main:app --host 0.0.0.0 --port 8765
+```
+
+**关键参数**: `--host 0.0.0.0` 允许局域网内其他设备访问
+
+### 6.3 对接地址
+
+假设本机 IP 为 `192.168.1.100`：
+
+| 用途 | 地址 |
+|------|------|
+| **本机访问** | `http://localhost:8765` |
+| **局域网访问** | `http://192.168.1.100:8765` |
+| **API 文档** | `http://192.168.1.100:8765/docs` |
+| **WebSocket** | `ws://192.168.1.100:8765/api/v1/ws/meeting/{id}?user_id=xxx` |
+
+### 6.4 验证局域网访问
+
+在**另一台设备**（手机/同事电脑）上：
+
+1. 浏览器打开 `http://你的IP:8765/docs`
+2. 看到 Swagger API 文档即成功
+
+---
+
+## 七、自动启动配置（Windows）
+
+### 7.1 手动启动（开发调试）
+```batch
+cd src
+python -m uvicorn main:app --host 0.0.0.0 --port 8765
+```
+
+### 7.2 自动启动（生产环境）
+
+#### 方式一：任务计划程序（推荐）
+
+1. **安装自动启动任务**:
+   ```batch
+   scripts\install_auto_start.bat
+   ```
+
+2. **验证任务已创建**:
+   - 打开"任务计划程序"（taskschd.msc）
+   - 查看任务库中的 `MeetingManagementServer`
+
+3. **立即启动服务测试**:
+   ```batch
+   scripts\start_server.bat
+   ```
+
+4. **停止服务**:
+   ```batch
+   scripts\stop_server.bat
+   ```
+
+5. **检查服务状态**:
+   ```batch
+   scripts\check_server.bat
+   ```
+
+6. **卸载自动启动**:
+   ```batch
+   scripts\uninstall_auto_start.bat
+   ```
+
+#### 方式二：创建 Windows 服务（使用 nssm）
+
+如果需要作为系统服务运行：
+
+1. 下载 [nssm](https://nssm.cc/download)
+2. 创建服务:
+   ```batch
+   nssm install MeetingManagementServer
+   # 设置 Path: python
+   # 设置 Arguments: -m uvicorn main:app --host 0.0.0.0 --port 8765
+   # 设置 Working directory: C:\...\meeting-management\src
+   ```
+
+### 7.3 开机自启配置检查清单
+
+- [ ] 批处理脚本路径正确（使用绝对路径）
+- [ ] Windows 防火墙已开放 8765 端口
+- [ ] 任务计划程序中任务状态为"就绪"
+- [ ] 测试重启后服务自动启动
+- [ ] 测试服务可正常访问 http://localhost:8765/docs
+
+---
+
+## 八、验证测试
+
+### 8.1 健康检查
 
 ```bash
 # HTTP 健康检查
-curl http://localhost:8765/health
+curl http://localhost:8765/api/v1/system/health
 
 # 预期返回:
-{"status": "ok", "service": "meeting-server", "version": "0.9-beta"}
+{"code": 0, "data": {"status": "healthy", "version": "1.1-beta"}}
 ```
 
-### 6.2 WebSocket 连接测试
+### 8.2 WebSocket 连接测试
 
 ```bash
 # 使用 wscat (需安装: npm install -g wscat)
-wscat -c ws://localhost:8765/ws/meeting/test-session
+wscat -c "ws://localhost:8765/api/v1/ws/meeting/test-session?user_id=test"
 
-# 或运行测试脚本
-cd scripts
-python test_handy_mock.py
+# 发送测试消息
+> {"type": "start", "title": "测试会议"}
 ```
 
-### 6.3 端到端测试
+### 8.3 浏览器测试
 
-```bash
-cd scripts
-python e2e_test.py
-```
+打开 `test/real/index.html`，按页面指引测试完整流程。
+
 
 ---
 
-## 七、目录结构
+## 九、目录结构
 
 ```
 meeting-management/
 ├── src/                          # 核心源码
+│   ├── main.py                  # FastAPI 入口 ⭐主程序
 │   ├── meeting_skill.py         # Skill 主接口
 │   ├── ai_minutes_generator.py  # AI 纪要生成
-│   └── __init__.py
-├── scripts/                      # 脚本工具
-│   ├── websocket_server.py      # WebSocket 服务器 ⭐主程序
-│   ├── meeting_assistant.py     # 会议助手 CLI
-│   ├── generate_minutes.py      # 纪要生成
-│   ├── test_handy_mock.py       # 模拟客户端测试
-│   ├── e2e_test.py              # 端到端测试
-│   └── requirements.txt         # Python 依赖
+│   ├── logger_config.py         # 日志配置
+│   ├── utils.py                 # 工具函数
+│   ├── api/                     # API 路由
+│   │   ├── meetings.py          # 会议管理 REST API
+│   │   ├── websocket.py         # WebSocket 实时通信
+│   │   ├── upload.py            # 文件上传
+│   │   └── system.py            # 系统接口
+│   ├── services/                # 服务层
+│   │   ├── websocket_manager.py # WebSocket 连接管理
+│   │   └── transcription_service.py # 转写服务
+│   ├── models/                  # 数据模型
+│   │   └── meeting.py           # SQLAlchemy 模型
+│   └── database/                # 数据库
+│       └── connection.py        # 数据库连接
+├── scripts/                      # 脚本工具（已归档）
 ├── output/                       # 输出目录
-│   ├── meetings/                # 会议纪要 (按年月组织)
-│   │   └── 2026/
-│   │       └── 02/
-│   │           └── M20260225_143012_xxx/
-│   │               ├── minutes_v1.json
-│   │               └── minutes_v1.docx
-│   ├── action_registry.json     # 全局行动项台账
-│   └── logs/                    # 运行日志
+│   └── meetings/                # 会议纪要 (按年月组织)
+│       └── 2026/
+│           └── 02/
+│               └── M20260225_143012_xxx/
+│                   ├── minutes_v1.json
+│                   ├── minutes_v1.docx
+│                   └── audio.webm
+├── test/                        # 测试文件
+│   └── real/
+│       └── index.html           # 浏览器测试页面
 ├── docs/                         # 文档
+│   ├── BACKEND_API.md           # API 文档
 │   ├── SKILL.md                 # 开发规格
-│   ├── 业务流程.md               # 业务流程
-│   └── 未来方向.md               # 路线图
+│   └── DEPLOYMENT.md            # 本文件
 ├── .env                          # 环境变量配置
-├── DEPLOYMENT.md                # 本文件
 ├── PROJECT_CONTEXT.md           # 项目上下文
 ├── SESSION_STATE.yaml           # 任务状态
 └── CHANGELOG.md                 # 变更日志
@@ -381,44 +503,49 @@ meeting-management/
 
 ---
 
-## 八、API 接口
+## 十、API 接口
 
-### 8.1 WebSocket 接口
+### 10.1 WebSocket 接口 (v1.1)
 
-| 端点                                       | 描述           |
-| ------------------------------------------ | -------------- |
-| `ws://host:port/ws/meeting/{session_id}` | 会议实时转写流 |
+| 端点 | 描述 |
+|------|------|
+| `ws://host:port/api/v1/ws/meeting/{session_id}?user_id=xxx` | 会议实时转写流 |
 
-**消息格式：**
+**消息协议：**
 
 ```json
-// 客户端发送 (Handy → Server)
-{
-  "type": "transcription",
-  "text": "我们今天讨论技术方案",
-  "is_final": true,
-  "timestamp": 1700000000000
-}
+// 客户端发送
+{"type": "start", "title": "会议标题"}
+{"type": "chunk", "sequence": 1, "data": "base64..."}
+{"type": "end"}
 
-// 服务器响应 (预留实时推送)
-{
-  "type": "ack",
-  "segment_id": "seg-001"
-}
+// 服务器推送
+{"type": "started", "meeting_id": "xxx", "audio_path": "..."}
+{"type": "transcript", "text": "转写内容", "sequence": 1}
+{"type": "completed", "full_text": "...", "minutes_path": "..."}
+{"type": "error", "code": "...", "message": "..."}
 ```
 
-### 8.2 HTTP 接口
+### 10.2 REST API
 
-| 方法 | 端点                                   | 描述               |
-| ---- | -------------------------------------- | ------------------ |
-| GET  | `/health`                            | 健康检查           |
-| POST | `/api/meeting/{session_id}/finalize` | 结束会议并生成纪要 |
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| GET | `/api/v1/system/health` | 健康检查 |
+| GET | `/api/v1/meetings` | 会议列表 |
+| POST | `/api/v1/meetings` | 创建会议 |
+| GET | `/api/v1/meetings/{id}` | 会议详情 |
+| GET | `/api/v1/meetings/{id}/result` | 获取纪要 |
+| GET | `/api/v1/meetings/{id}/download` | 下载文件 |
+| POST | `/api/v1/upload/audio` | 上传音频 |
+| GET | `/api/v1/upload/{id}/status` | 查询状态 |
+
+完整 API 文档见: `http://localhost:8765/docs`
 
 ---
 
-## 九、监控与日志
+## 十一、监控与日志
 
-### 9.1 日志位置
+### 11.1 日志位置
 
 ```
 # 默认输出到控制台，可重定向到文件
@@ -429,7 +556,7 @@ sudo journalctl -u meeting-server -f
  tail -f output/logs/server.log
 ```
 
-### 9.2 关键指标
+### 11.2 关键指标
 
 | 指标     | 检查命令                              |
 | -------- | ------------------------------------- |
@@ -440,7 +567,7 @@ sudo journalctl -u meeting-server -f
 
 ---
 
-## 十、常见问题
+## 十二、常见问题
 
 ### Q1: 启动报错 "ModuleNotFoundError"
 
@@ -480,9 +607,9 @@ set PYTHONIOENCODING=utf-8
 
 ---
 
-## 十一、备份与恢复
+## 十三、备份与恢复
 
-### 11.1 备份数据
+### 13.1 备份数据
 
 ```bash
 # 备份会议数据
@@ -492,7 +619,7 @@ tar -czf meeting-backup-$(date +%Y%m%d).tar.gz output/meetings/
 cp .env .env.backup
 ```
 
-### 11.2 恢复数据
+### 13.2 恢复数据
 
 ```bash
 # 解压备份
@@ -504,9 +631,9 @@ cp .env.backup .env
 
 ---
 
-## 十二、交接清单
+## 十四、交接清单
 
-### 12.1 交付物
+### 14.1 交付物
 
 - [ ] 源代码仓库地址
 - [ ] 服务器访问权限 (SSH/远程桌面)
@@ -515,14 +642,14 @@ cp .env.backup .env
 - [ ] 防火墙规则
 - [ ] 域名/SSL 证书 (如使用)
 
-### 12.2 文档
+### 14.2 文档
 
 - [ ] 本部署文档 (DEPLOYMENT.md)
 - [ ] 项目上下文 (PROJECT_CONTEXT.md)
 - [ ] 业务流程 (docs/业务流程.md)
 - [ ] 开发规格 (docs/SKILL.md)
 
-### 12.3 验证项
+### 14.3 验证项
 
 - [ ] 服务正常启动
 - [ ] 健康检查通过
@@ -532,7 +659,7 @@ cp .env.backup .env
 
 ---
 
-## 十三、联系方式
+## 十五、联系方式
 
 | 角色       | 联系人 | 职责               |
 | ---------- | ------ | ------------------ |
@@ -634,5 +761,5 @@ bun tauri build
 ---
 
 **文档版本**: v1.1
-**最后更新**: 2026-02-25
+**最后更新**: 2026-02-26
 **维护人**: -

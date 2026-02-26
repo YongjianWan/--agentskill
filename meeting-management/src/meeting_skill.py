@@ -40,6 +40,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
 
+from ai_minutes_generator import filter_noise_words, NOISE_WORDS
+
 warnings.filterwarnings("ignore")
 
 
@@ -370,7 +372,8 @@ def generate_minutes(
     recorder: str = "",
     audio_path: Optional[str] = None,
     version: int = 1,
-    use_ai: bool = True
+    use_ai: bool = True,
+    detail_level: str = "detailed"
 ) -> Meeting:
     """
     生成会议纪要（现在使用 DeepSeek AI）
@@ -379,6 +382,7 @@ def generate_minutes(
         transcription: 转写文本
         title: 会议标题
         use_ai: 是否使用 AI 生成（默认 True）
+        detail_level: 纪要详细程度，"detailed"(详细) 或 "concise"(简洁)
         ... 其他参数
         
     Returns:
@@ -398,9 +402,9 @@ def generate_minutes(
     # 使用 AI 生成纪要内容
     if use_ai:
         try:
-            from .ai_minutes_generator import generate_minutes_with_ai
+            from ai_minutes_generator import generate_minutes_with_ai
             
-            ai_result = generate_minutes_with_ai(transcription, title_hint=title)
+            ai_result = generate_minutes_with_ai(transcription, title_hint=title, detail_level=detail_level)
             
             if ai_result:
                 # 使用 AI 生成的标题（如果未提供）
@@ -503,22 +507,39 @@ def save_meeting(
     docx_path = meeting_dir / f"minutes_v{meeting.version}.docx"
     _create_word_document(meeting, docx_path)
     
-    # 备份录音
+    # Windows 不支持 symlink，直接复制（带重试解决 WinError 32）
+    import shutil
+    import time
+    
+    def copy_with_retry(src, dst, max_retries=5):
+        for attempt in range(max_retries):
+            try:
+                shutil.copy2(src, dst)
+                return True
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    print(f"[WARN] 复制文件被占用 {src.name}，{attempt+1}/{max_retries} 重试...")
+                    time.sleep(0.5)
+                else:
+                    raise
+    
+    # 备份录音（带重试）
     audio_backup_path = None
     if meeting.audio_path and Path(meeting.audio_path).exists():
         audio_name = Path(meeting.audio_path).name
         audio_backup_path = meeting_dir / f"audio_{audio_name}"
-        import shutil
-        shutil.copy2(meeting.audio_path, audio_backup_path)
+        try:
+            copy_with_retry(Path(meeting.audio_path), audio_backup_path)
+        except PermissionError:
+            print(f"[WARN] 音频文件备份失败，跳过")
+            audio_backup_path = None
     
     # 更新最新版本链接
     latest_json = meeting_dir / "minutes_latest.json"
     latest_docx = meeting_dir / "minutes_latest.docx"
     
-    # Windows 不支持 symlink，直接复制
-    import shutil
-    shutil.copy2(json_path, latest_json)
-    shutil.copy2(docx_path, latest_docx)
+    copy_with_retry(json_path, latest_json)
+    copy_with_retry(docx_path, latest_docx)
     
     # 保存到全局台账
     _append_to_action_registry(meeting, output_dir)
@@ -924,7 +945,27 @@ def init_meeting_session(meeting_id: str, title: str = "", user_id: str = "anony
     Returns:
         audio文件路径
     """
-    from src.models.meeting import MeetingModel, MeetingStatus
+    from models.meeting import MeetingModel, MeetingStatus
+    
+    # 【关键】如果同名会话已存在，强制关闭旧文件句柄（防止WinError 32）
+    if meeting_id in _audio_sessions:
+        print(f"[WARN] 会话 {meeting_id} 已存在，强制清理旧会话...")
+        old_session = _audio_sessions[meeting_id]
+        fh = old_session.get("file_handle")
+        if fh and not fh.closed:
+            try:
+                fh.flush()
+                fh.close()
+                print(f"[INFO] 旧会话文件句柄已关闭")
+            except Exception as e:
+                print(f"[WARN] 关闭旧会话文件句柄失败: {e}")
+        # 等待Windows释放文件锁
+        import time
+        time.sleep(0.5)
+        # 删除旧会话
+        del _audio_sessions[meeting_id]
+        import gc
+        gc.collect()
     
     # 创建目录 output/meetings/YYYY/MM/{meeting_id}/
     now = datetime.now()
@@ -1003,9 +1044,13 @@ def transcribe_bytes(audio_bytes: bytes, mime_type: str = "audio/webm") -> Dict[
             })
             full_text_parts.append(text)
         
+        full_text = " ".join(full_text_parts)
+        # 过滤噪声词
+        full_text = filter_noise_words(full_text)
+        
         return {
             "segments": results,
-            "full_text": " ".join(full_text_parts),
+            "full_text": full_text,
             "language": info.language
         }
     finally:
@@ -1026,7 +1071,7 @@ def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int,
     Returns:
         转写文本（如触发转写），否则None
     """
-    from src.models.meeting import TranscriptModel
+    from models.meeting import TranscriptModel
     
     session = _audio_sessions.get(meeting_id)
     if session is None:
@@ -1061,6 +1106,8 @@ def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int,
                     # 转写
                     result = transcribe_bytes(audio_data)
                     transcript_text = result.get("full_text", "")
+                    # 过滤噪声词
+                    transcript_text = filter_noise_words(transcript_text)
                     
                     # 记录转写结果
                     if transcript_text:
@@ -1094,66 +1141,120 @@ def finalize_meeting(meeting_id: str, db_session=None) -> dict:
     Returns:
         {"audio_path": "...", "minutes_path": "...", "full_text": "..."}
     """
-    from src.models.meeting import MeetingModel, MeetingStatus
+    from models.meeting import MeetingModel, MeetingStatus
+    
+    print(f"[DEBUG] finalize_meeting 开始: meeting_id={meeting_id}")
     
     session = _audio_sessions.get(meeting_id)
     if session is None:
+        print(f"[ERROR] finalize_meeting 失败: 会议会话不存在 {meeting_id}")
         raise ValueError(f"Meeting session not found: {meeting_id}")
     
+    # ========== 第一步：关闭句柄，读数据到内存，彻底释放文件 ==========
+    
     # 关闭文件句柄
-    if session["file_handle"] and not session["file_handle"].closed:
-        session["file_handle"].close()
+    fh = session.get("file_handle")
+    if fh and not fh.closed:
+        print(f"[DEBUG] 关闭文件句柄...")
+        fh.flush()
+        fh.close()
     session["file_handle"] = None
     
+    # 复制所有需要的数据到局部变量
     audio_path = Path(session["audio_path"])
+    meeting_dir = session["meeting_dir"]
     chunk_count = session["chunk_count"]
-    transcript_parts = session["transcript_parts"]
+    transcript_parts = list(session["transcript_parts"])  # 复制一份
+    title = session["title"]
+    start_time = session["start_time"]
     
+    # 从session字典中删除，彻底断开引用
+    print(f"[DEBUG] 删除会话，彻底释放资源...")
+    del _audio_sessions[meeting_id]
+    
+    # Windows需要这个
+    import gc
+    gc.collect()
+    
+    import platform
+    import time
+    if platform.system() == "Windows":
+        time.sleep(0.3)
+    
+    # 读音频到内存
+    print(f"[DEBUG] 读取音频文件...")
+    audio_data = b""
     try:
-        # 读取音频数据（备用）
         with open(audio_path, "rb") as f:
             audio_data = f.read()
-        
-        # 拼接历史转写结果
-        full_transcript = " ".join(transcript_parts)
-        
-        # 如果一次都没转写过（会议太短），才做一次全量转写
-        if not full_transcript and len(audio_data) > 0:
+        print(f"[DEBUG] 音频文件读取成功: {len(audio_data)} bytes")
+    except PermissionError:
+        print(f"[WARN] 读取被占用，等待1秒重试...")
+        time.sleep(1)
+        with open(audio_path, "rb") as f:
+            audio_data = f.read()
+        print(f"[DEBUG] 音频文件重试读取成功: {len(audio_data)} bytes")
+    
+    # ========== 第二步：用内存数据处理，不再碰文件句柄 ==========
+    
+    # 拼接历史转写结果
+    full_transcript = " ".join(transcript_parts)
+    print(f"[DEBUG] 历史转写拼接: {len(full_transcript)} 字符")
+    
+    # 没转写过就全量转一次
+    if not full_transcript and len(audio_data) > 0:
+        print(f"[DEBUG] 无历史转写，执行全量转写...")
+        try:
             result = transcribe_bytes(audio_data)
             full_transcript = result.get("full_text", "")
-        
-        # 生成会议纪要（调用AI）
-        minutes_path = Path(session["meeting_dir"]) / "minutes.docx"
-        
-        # 使用generate_minutes生成纪要（需要转写文本）
+            print(f"[DEBUG] 全量转写完成: {len(full_transcript)} 字符")
+        except Exception as e:
+            print(f"[ERROR] 全量转写失败: {e}")
+            import traceback
+            traceback.print_exc()
+            full_transcript = ""
+    
+    # 生成纪要
+    minutes_path = Path(meeting_dir) / "minutes.docx"
+    print(f"[DEBUG] 开始生成纪要，目标路径: {minutes_path}")
+    
+    try:
         meeting_data = generate_minutes(
             transcription=full_transcript,
             meeting_id=meeting_id,
-            title=session["title"],
-            date=session["start_time"].strftime("%Y-%m-%d"),
-            audio_path=str(audio_path)
+            title=title,
+            date=start_time.strftime("%Y-%m-%d"),
+            audio_path=str(audio_path),
+            detail_level="detailed"  # 使用详细版模板生成纪要
         )
-        
-        # 保存Word
-        files = save_meeting(meeting_data, output_dir="./output", create_version=False)
-        
-        # 移动/重命名为标准路径
-        if "docx" in files:
-            import shutil
-            src_docx = files["docx"]
-            if Path(src_docx) != minutes_path:
-                shutil.move(src_docx, minutes_path)
-        
-        return {
-            "meeting_id": meeting_id,
-            "audio_path": str(audio_path),
-            "minutes_path": str(minutes_path),
-            "full_text": full_transcript,
-            "chunk_count": chunk_count
-        }
-    finally:
-        # 清理会话（无论成功与否都要清理）
-        del _audio_sessions[meeting_id]
+        print(f"[DEBUG] generate_minutes 完成: title={meeting_data.title}, topics={len(meeting_data.topics)}")
+    except Exception as e:
+        print(f"[ERROR] generate_minutes 失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
+    # 保存Word
+    print(f"[DEBUG] 开始保存会议纪要...")
+    try:
+        files = save_meeting(meeting_data, output_dir=meeting_dir, create_version=False)
+        print(f"[DEBUG] save_meeting 完成: files={files}")
+    except Exception as e:
+        print(f"[ERROR] save_meeting 失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
+    # 直接使用 save_meeting 生成的文件路径（避免 shutil.move 触发 WinError 32）
+    actual_minutes_path = files.get("docx", minutes_path)
+    print(f"[DEBUG] finalize_meeting 成功完成")
+    return {
+        "meeting_id": meeting_id,
+        "audio_path": str(audio_path),
+        "minutes_path": str(actual_minutes_path),
+        "full_text": full_transcript,
+        "chunk_count": chunk_count
+    }
 
 
 # ============ CLI ============

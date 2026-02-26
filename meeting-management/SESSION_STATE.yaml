@@ -1,24 +1,62 @@
 # 会话状态文件
 # AI 助手在每轮会话结束时更新此文件
 # 新会话开始时首先读取此文件
-
+# 灵活使用 SetTodoList 和子代理(subagents)高效完成任务
 meta:
   project: "meeting-management"
-  version: "1.1-beta"
+  version: "1.1.1"
   updated: "2026-02-26"
-  session_count: 10
+  session_count: 14
   last_session_summary: |
-    本轮完成：
-    1. DB-001: 数据库扩展完成（新增transcripts/action_items表，扩展MeetingModel）
-    2. SKILL-001: 流式处理方法完成（init_meeting_session/append_audio_chunk/finalize_meeting）
-    3. WS-001: WebSocket协议改造完成（start/chunk/end新协议）
-    4. TEST-001: 单元测试完成（test_audio_stream.py全通过）
-    5. 添加VS Code配置和Pyright类型检查配置
+    本轮完成（第18轮 - Phase 4前功能补全+自动启动配置）：
+    1. 功能补全完成：
+       - 会议纪要下载接口 GET /meetings/{id}/download
+       - REST API结束会议后异步触发AI生成
+       - 会议列表搜索（日期范围+关键词）
+    2. AI纪要增强：
+       - 详细版/简洁版双模板系统
+       - 详细版增加讨论要点、交付物描述、会议总结
+    3. 噪声词过滤修复：
+       - 更新.env默认配置
+       - 实时转写流程添加过滤
+    4. Windows自动启动配置：
+       - 创建启动/停止/检查脚本
+       - 安装任务计划程序任务（MeetingManagementServer）
+       - 服务已启动运行正常
+    5. 文档更新：
+       - CHANGELOG.md v1.1.1
+       - PROJECT_CONTEXT.md Phase 3.5标记完成
+       - DEPLOYMENT.md 自动启动章节
+    
+    当前状态：
+    - Phase 4之前所有开发已完成
+    - 系统可正常使用，支持开机自动启动
+    - 等待Phase 4：通义千问接入、多风格模板、流式预览
+    本轮完成（第17轮 - 修复 WinError 32 并配置局域网部署）：
+    1. 修复 WinError 32 文件锁问题：
+       - WebSocket 层添加双层锁机制（lifecycle_lock + chunk_lock）
+       - finalize_meeting 重构为先复制数据再处理
+       - save_meeting 添加文件复制重试机制
+       - 去掉 shutil.move 避免文件锁冲突
+    2. 浏览器真实测试通过：
+       - WebSocket 协议工作正常（start/chunk/end）
+       - 实时转写正常（每30秒触发）
+       - 会议纪要生成正常
+       - WinError 32 已解决
+    3. 局域网部署配置：
+       - Windows 防火墙开放 8765 端口
+       - 服务绑定 0.0.0.0 允许外部访问
+       - DEPLOYMENT.md 文档已更新
+    
+    当前状态：
+    - 核心功能全部可用
+    - 局域网部署就绪，可供同事对接
+    - 等待 Phase 4 AI纪要生成增强
 
 # === 系统状态 ===
 system:
-  phase: "re-architecture"
-  # re-architecture: 架构重构期（抛弃Handy，浏览器直连自建转写后端）
+  phase: "phase3.5-complete"
+  # phase3.5-complete: Phase 3.5 功能补全已完成，等待 Phase 4
 
   key_decisions:
     - "【架构定位】灵犀'帮我听'声音模块，后端独立服务"
@@ -32,18 +70,128 @@ system:
 
 # === 当前任务 ===
 tasks:
-  active:
+  active: []
+  
+  completed:
+    - id: "FIX-008"
+      desc: "修复 WebSocketManager 清理任务启动"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "在 main.py lifespan 中添加 websocket_manager.start()/stop() 调用"
+      
+    - id: "FIX-009"
+      desc: "修复转写时间戳更新时机"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "将 last_chunk_time 更新移到转写开始前，避免重复触发"
+      
+    - id: "FIX-010"
+      desc: "修复 Windows 中文编码问题"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "添加 sys.stdout.reconfigure(encoding='utf-8') 和 chcp 65001"
+      files:
+        - "src/main.py"
+        - "src/logger_config.py"
+        
+    - id: "FIX-011"
+      desc: "修复控制台输出乱码"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "日志 StreamHandler 使用 UTF-8 编码包装"
+      files:
+        - "src/logger_config.py"
+        
+    - id: "FIX-012"
+      desc: "统一文件读写 UTF-8 编码"
+      status: "completed"
+      done: "2026-02-26"
+      note: "所有 Python 文件已含 utf-8 编码声明"
+      
+    - id: "FIX-013"
+      desc: "实现文件上传后自动转写"
+      status: "completed"
+      done: "2026-02-26"
+      files:
+        - "src/api/upload.py"
+      features:
+        - "上传后触发异步转写任务"
+        - "自动调用 transcribe() 处理音频"
+        - "生成会议纪要并保存 DOCX/JSON"
+        - "更新数据库状态为 COMPLETED"
+        
+    - id: "FIX-014"
+      desc: "修复 .env 文件编码损坏"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "重新创建 .env 文件，确保 UTF-8 编码"
+      impact: "AI_NOISE_WORDS 噪声词过滤恢复正常"
+      
+    - id: "FIX-015"
+      desc: "修复 Windows 文件句柄占用 [WinError 32]"
+      status: "completed"
+      done: "2026-02-26"
+      fix: "finalize_meeting 添加 0.1s 延迟确保句柄释放"
+      file: "src/meeting_skill.py"
+        
+    - id: "TEST-004"
+      desc: "MP3文件转写测试"
+      status: "completed"
+      done: "2026-02-26"
+      test_file: "test/周四 10点19分.mp3"
+      result:
+        file_size: "7.67 MB"
+        duration: "670 秒 (11分钟)"
+        transcribe_time: "216.5 秒"
+        text_length: "5070 字符"
+        speakers: "3人 (Speaker1, Speaker2, Speaker3)"
+        status: "✅ 成功"
+      
+    - id: "DESIGN-001"
+      desc: "Phase 4 AI纪要生成设计文档"
+      status: "completed"
+      done: "2026-02-26"
+      files:
+        - "docs/PHASE4_DESIGN.md"
+      features:
+        - "通义千问 API 配置方案"
+        - "5种纪要模板设计"
+        - "流式生成器架构"
+        - "WebSocket 消息格式"
+      
+    - id: "REAL-TEST-001"
+      desc: "【真实测试】创建浏览器测试页面"
+      status: "completed"
+      done: "2026-02-26"
+      files:
+        - "test/real/index.html - 完整浏览器测试页面"
+        - "test/real/README.md - 使用说明"
+      features:
+        - "MediaRecorder 录音 (WebM/Opus)"
+        - "WebSocket 实时通信"
+        - "实时显示转写结果"
+        - "显示会议纪要"
+        - "系统日志调试"
+      
+    - id: "CLEAN-001"
+      desc: "【清理】归档旧Handy相关代码"
+      status: "completed"
+      done: "2026-02-26"
+      deleted:
+        - "scripts/websocket_server.py"
+        - "scripts/websocket_server_v2.py"
+        - "scripts/test_handy_mock.py"
+      archived:
+        - "Handy-source/ -> archive/Handy-source/"  
+      note: "Handy源码完整保留在archive目录，备用价值：本地离线转写参考"
+      
     - id: "TEST-002"
       desc: "【端到端测试】WebSocket全链路测试"
-      status: "in_progress"
-      start: "2026-02-26"
-      steps:
-        - "启动服务: cd src && uvicorn main:app --reload --port 8765"
-        - "运行测试: python test/test_websocket_new_protocol.py"
-        - "验证: start → chunk → end 全链路通"
-      note: "测试脚本已写好，需要启动服务后运行"
+      status: "completed"
+      done: "2026-02-26"
+      result: "通过 - start/chunk/end协议工作正常"
+      note: "mock音频导致转写失败是预期的，协议层已验证"
       
-  completed:
     - id: "WS-001"
       desc: "【WebSocket】改造协议为start/chunk/end"
       status: "completed"
@@ -74,6 +222,31 @@ tasks:
         - "MeetingModel: +minutes_docx_path, +audio_chunks_received"
         - "新增 TranscriptModel 表"
         - "新增 ActionItemModel 表"
+        
+    - id: "SDK-001"
+      desc: "【SDK】JavaScript 浏览器 SDK"
+      status: "completed"
+      done: "2026-02-26"
+      files:
+        - "sdk/browser/meeting-client.js - SDK 源码"
+        - "sdk/browser/example.html - 示例页面"
+        - "sdk/browser/README.md - 使用文档"
+      features:
+        - "WebSocket 连接管理"
+        - "MediaRecorder 录音封装"
+        - "实时转写回调"
+        - "会议纪要获取"
+        
+    - id: "SDK-002"
+      desc: "【文档】前端对接文档更新"
+      status: "completed"
+      done: "2026-02-26"
+      files:
+        - "docs/BACKEND_API.md - 新增前端对接示例章节"
+      features:
+        - "JavaScript/TypeScript SDK 使用示例"
+        - "REST API 调用示例"
+        - "完整 HTML 示例代码"
       
     - id: "TEST-001"
       desc: "【单元测试】meeting_skill流式处理"
@@ -85,14 +258,15 @@ tasks:
         - "错误处理"
       
   next:
-    - id: "CLEAN-001"
-      desc: "【清理】删除旧Handy相关代码"
+    - id: "PHASE-004"
+      desc: "【Phase 4】AI纪要生成增强"
       status: "pending"
-      targets:
-        - "scripts/websocket_server.py（旧Handy版）"
-        - "scripts/websocket_server_v2.py"
-        - "Handy相关测试脚本"
-      note: "旧代码就是负债，直接删不留legacy"
+      tasks:
+        - "接入通义千问API（替代DeepSeek）"
+        - "多风格纪要模板（行动项版、高管摘要版）"
+        - "实时纪要预览（WebSocket流式推送）"
+        - "前端SDK支持模板选择"
+      note: "根据docs/PHASE4_DESIGN.md设计文档实施"
 
 # === 新会话必读 ===
 new_session_guide:
@@ -101,23 +275,71 @@ new_session_guide:
     - "本文件(SESSION_STATE.yaml) - 当前任务状态"
     
   current_status: |
-    架构重构基本完成，核心功能已就绪：
-    - 数据库: 表结构已扩展，支持音频流存储
-    - meeting_skill: 流式处理方法已实现并测试通过
-    - WebSocket: 新协议(start/chunk/end)已实现
+    ✅ Phase 4 之前所有开发已完成！
     
-    下一步是端到端测试，验证全链路是否通畅。
+    已完成的功能 (Phase 1-3.5):
+    - ✅ 数据库: 表结构扩展，支持音频流存储
+    - ✅ meeting_skill: 流式处理 (init/append/finalize)
+    - ✅ WebSocket: start/chunk/end 协议全链路验证
+    - ✅ 音频处理: WebM→WAV 转码，Whisper 转写
+    - ✅ AI纪要: DeepSeek API 生成，详细版/简洁版双模板
+    - ✅ 下载接口: Word/JSON 格式下载
+    - ✅ 搜索功能: 日期范围 + 关键词搜索
+    - ✅ 噪声过滤: 实时转写+AI生成双重过滤
+    - ✅ 错误处理: WinError 32 修复，完整错误码
+    - ✅ 局域网部署: 防火墙配置，0.0.0.0 绑定
+    - ✅ SDK: JavaScript SDK (meeting-client.js)
+    - ✅ 测试: 7/7 功能测试通过
+    
+    等待 Phase 4:
+    - ⏳ 通义千问 API 接入
+    - ⏳ 多风格纪要模板（详细/简洁/行动项/高管）
+    - ⏳ 实时纪要预览（WebSocket 流式推送）
     
   important_notes:
+    - "✅ Phase 4 之前所有功能已就绪，系统可正常使用"
+    - "✅ Windows 自动启动任务已安装（MeetingManagementServer）"
     - "Pylance类型警告: SQLAlchemy Column相关警告是预期的，不影响运行"
     - "类型检查模式: 已设为basic，误报已最小化"
-    - "测试: 先运行test_audio_stream.py确认单元测试通过，再跑WebSocket端到端"
+
+  deployment_notes: |
+    自动启动配置:
+    - 任务名称: MeetingManagementServer
+    - 触发器: 系统启动时（延迟30秒）
+    - 状态: Ready
+    - 管理命令:
+      - 查看: schtasks /Query /TN "MeetingManagementServer"
+      - 运行: schtasks /Run /TN "MeetingManagementServer"
+      - 删除: schtasks /Delete /TN "MeetingManagementServer" /F
+    - 手动控制:
+      - 启动: scripts\start_server.bat
+      - 停止: scripts\stop_server.bat
+      - 检查: scripts\check_server.bat
     
   quick_commands:
     - "启动服务: cd src && uvicorn main:app --reload --port 8765"
+    - "局域网模式: cd src && uvicorn main:app --host 0.0.0.0 --port 8765"
     - "单元测试: python test/test_audio_stream.py"
     - "WebSocket测试: python test/test_websocket_new_protocol.py"
+    - "真实音频测试: python test/test_websocket_real_webm.py"
+    - "浏览器测试: 打开 test/real/index.html (需先启动服务)"
     - "API文档: http://localhost:8765/docs"
+    - "局域网API文档: http://172.20.3.70:8765/docs"
+    - "WebSocket地址: ws://172.20.3.70:8765/api/v1/ws/meeting/{id}?user_id=xxx"
+    - "SDK示例: 打开 sdk/browser/example.html"
+
+# === 局域网部署配置 ===
+network:
+  firewall_rule: "Meeting Backend"
+  port: 8765
+  bind_host: "0.0.0.0"
+  local_ips:
+    - "172.20.3.70"    # 推荐（物理网卡）
+    - "172.16.0.1"     # 可用
+  external_access:
+    api_docs: "http://172.20.3.70:8765/docs"
+    websocket: "ws://172.20.3.70:8765/api/v1/ws/meeting/{session_id}?user_id={user_id}"
+    rest_api: "http://172.20.3.70:8765/api/v1"
 
 # === 重构决策记录 ===
 rearchitecture:
@@ -154,6 +376,12 @@ rearchitecture:
 # === 已知问题 ===
 issues:
   open:
+    - id: "QUALITY-001"
+      desc: "转写质量需用真实语音验证"
+      severity: "medium"
+      impact: "当前测试音频转写结果较短（7-38字符），可能原因：1)测试音频本身无有效语音 2)Whisper small模型对中文识别能力有限"
+      workaround: "使用 test/real/index.html 进行真人语音测试验证"
+      
     - id: "PYLANCE-001"
       desc: "Pylance对SQLAlchemy Column类型推断不完全准确"
       severity: "low"
@@ -167,6 +395,7 @@ quickref:
   dev_spec: "docs/SKILL.md"
   protocol: "docs/DOCUMENT_PROTOCOL.md"
   project_context: "PROJECT_CONTEXT.md"
+  deployment: "docs/DEPLOYMENT.md"
   tech_stack:
     core: "Python 3.11+"
     backend: "FastAPI + SQLAlchemy(async)"
@@ -180,6 +409,13 @@ quickref:
     - "src/api/websocket.py - WebSocket处理"
     - "src/models/meeting.py - 数据模型"
     - "src/services/websocket_manager.py - 连接管理"
+    - "test/real/index.html - 浏览器真实测试页面"
+    - "docs/BACKEND_API.md - API文档(v1.1)"
+  deployment_info:
+    local_ip: "172.20.3.70"
+    port: 8765
+    api_docs: "http://172.20.3.70:8765/docs"
+    websocket_url: "ws://172.20.3.70:8765/api/v1/ws/meeting/{session_id}?user_id={user_id}"
 
 # === 首读流程 ===
 reading_order:

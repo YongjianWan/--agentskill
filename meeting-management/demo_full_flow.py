@@ -11,6 +11,11 @@ import time
 import sys
 from pathlib import Path
 
+# Windows 控制台 UTF-8 编码设置
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
 # 配置
 WS_PORT = 8777
 WS_URL = f"ws://localhost:{WS_PORT}/ws/meeting/demo-meeting-001"

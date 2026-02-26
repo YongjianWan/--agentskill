@@ -1,15 +1,14 @@
 ---
 name: security-guidance
-description: Security guidance and best practices for code development
-source: Converted from Claude plugin (hooks-based)
+description: Security guidance and best practices for code development. Use when writing authentication code, handling sensitive data, validating user input, designing APIs, or reviewing code for security issues.
 license: See original LICENSE
 ---
 
-# security-guidance
+# Security Guidance
 
 Security guidance and best practices for code development.
 
-This skill provides security-focused guidance during code development, helping identify and prevent common security vulnerabilities.
+This skill provides security-focused guidance to help identify and prevent common security vulnerabilities.
 
 ## When to Use This Skill
 
@@ -84,4 +83,12 @@ Use this skill when:
 
 ---
 
-*Converted from Claude plugin hooks on 2026-02-22*
+## Quick Checklist
+
+Before deploying code, verify:
+- [ ] All user inputs are validated and sanitized
+- [ ] No hardcoded secrets or credentials
+- [ ] Proper error handling without information leakage
+- [ ] Authentication and authorization checks in place
+- [ ] HTTPS/TLS for all network communications
+- [ ] Dependencies are up-to-date and scanned for vulnerabilities

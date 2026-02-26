@@ -2,150 +2,153 @@
                         General Skills 技能清单
 ================================================================================
 生成时间: 2026-02-26
-总数: 43 个 Skill
-压缩包: general-skills-20260226-111214.zip (5.35 MB)
+总数: 28 个 Skill（已删除重复和平台特有版本）
+压缩包: general-skills-v2-20260226-151625.zip (3.74 MB)
 ================================================================================
 
-一、通用智能体 (20个)
+一、通用智能体 (9个) - 零配置
 ================================================================================
 
 1.  deep-research-agent
     通用深度研究Agent。类似ChatGPT Deep Research，适用于需要"搞清楚"的复杂问题。
+    状态: ✅ 完全可用，纯AI方法论
 
-2.  self-improving-agent
-    自我改进Agent。捕获学习和错误，实现持续改进。
+2.  debug-agent
+    Debug场景特化Agent。提供动手前检查清单、修改纪律、debug三板斧方法论。
+    状态: ✅ 完全可用，零依赖
 
-3.  debug-agent
-    Debug场景特化Agent。提供debug方法论和检查清单。
+3.  ralph-evolver
+    递归自我改进引擎。基于第一性原理思考，持续自我进化。
+    状态: ⚠️ 需要 Node.js >= 18
 
-4.  ralph-evolver
-    递归自我改进引擎。基于第一性原理思考。
-
-5.  feature-dev
+4.  feature-dev
     功能开发工作流。包含代码探索、架构设计和质量审查的专用Agent。
+    状态: ✅ 完全可用，纯AI驱动
 
-6.  smart-model-switching
-    智能模型路由。自动将任务路由到最便宜的可用模型。
-
-7.  skill-creator
-    Skill创建器。创建新skill、改进现有skill、测试skill性能。
-
-8.  skill-evolution
-    技能进化执行器。分析脚本使用效果、自动改进skill。
-
-9.  skill-manager
-    Skill管理器。管理OpenClaw skill的启用/禁用/分析。
-
-10. self-evolving-skill
-    自进化系统。基于预测编码和价值驱动的自动学习。
-
-11. code-mentor
+5.  code-mentor
     编程导师Agent。交互式编程教学、代码审查、算法练习。
+    状态: ⚠️ Python脚本可选，核心功能纯AI
 
-12. code-review
+6.  code-review
     代码审查Agent。自动化PR代码审查。
+    状态: ⚠️ 需要 GitHub CLI + 认证
 
-13. pr-review-toolkit
-    PR审查工具包。包含注释、测试、错误处理等专项审查Agent。
-
-14. code-simplifier
+7.  code-simplifier
     代码简化Agent。优化代码清晰度、一致性和可维护性。
+    状态: ✅ 完全可用，纯AI
 
-15. brainstorming
-    头脑风暴Agent。通过苏格拉底式提问将粗略想法转化为完整设计。
+8.  pr-review-toolkit
+    PR审查工具包。包含注释、测试、错误处理等专项审查Agent。
+    状态: ✅ 完全可用，纯AI
 
-16. doc-coauthoring
-    文档共创工作流。结构化协作文档创建。
-
-17. openclaw-doc-coauthoring
-    OpenClaw版本文档共创。
-
-18. web-artifacts-builder
-    Web Artifact构建器。创建复杂的多组件HTML artifact。
-
-19. script-advisor
-    脚本工程化执行器。四层脚本架构：原子→组合→Agent→配置。
-
-20. playground
-    Playground构建器。创建交互式HTML playground。
+9.  brainstorm
+    头脑风暴Agent。通过苏格拉底式提问将想法转化为完整设计。
+    状态: ✅ 完全可用，纯AI方法论
 
 
-二、办公辅助类 (23个)
+二、办公辅助/内容创作 (17个)
 ================================================================================
 
 【文档处理】
-21. docx
+10. docx
     Word文档处理。创建、编辑、提取.docx文件，支持修订和注释。
+    状态: ⚠️ 需要 Python/Node + LibreOffice + pandoc
 
-22. _docx
-    Word文档处理（副本）。
-
-23. openclaw-docx
-    OpenClaw版本Word文档处理。
-
-24. pdf
+11. pdf
     PDF处理。读取、创建、合并、拆分、填充表单、OCR等。
+    状态: ⚠️ 需要 Python + poppler-utils + qpdf
 
-25. openclaw-pdf
-    OpenClaw版本PDF处理。
+12. pptx
+    PPT制作。创建、编辑、分析演示文稿，支持html2pptx。
+    状态: ⚠️ 需要 Python/Node + LibreOffice
 
-26. pptx
-    PPT制作。创建、编辑、分析演示文稿。
-
-27. openclaw-pptx
-    OpenClaw版本PPT制作。
-
-28. xlsx
+13. xlsx
     Excel表格处理。创建、编辑、转换电子表格。
-
+    状态: ⚠️ 需要 Python pandas + openpyxl
 
 【内容创作】
-29. email-composer
-    邮件撰写。起草各类专业邮件。
-
-30. internal-comms
-    内部沟通。状态报告、领导更新、公司通讯等。
-
-31. theme-factory
-    主题工厂。提供10种预设主题样式，应用于slides/docs等。
-
-32. canvas-design
+14. canvas-design
     视觉设计。创建海报、艺术设计等静态视觉作品。
+    状态: ✅ 完全可用，字体资源已内置
 
-33. slack-gif-creator
+15. theme-factory
+    主题工厂。10种预设主题，应用于slides/docs等。
+    状态: ✅ 完全可用，主题资源已内置
+
+16. slack-gif-creator
     Slack GIF制作。创建优化用于Slack的动画GIF。
+    状态: ⚠️ 需要 Python pillow + imageio
 
-34. article-extractor
+17. web-artifacts-builder
+    Web Artifact构建器。创建复杂的多组件HTML artifact。
+    状态: ⚠️ 需要 Node.js 18+ + pnpm
+
+18. playground
+    Playground构建器。创建交互式HTML playground。
+    状态: ✅ 完全可用，模板已内置
+
+19. doc-coauthoring
+    文档共创工作流。结构化协作文档创建。
+    状态: ✅ 完全可用，纯AI工作流
+
+20. email-composer
+    邮件撰写。起草各类专业邮件。
+    状态: ✅ 完全可用，纯模板
+
+21. internal-comms
+    内部沟通。状态报告、领导更新、公司通讯等。
+    状态: ✅ 完全可用，含示例文件
+
+22. article-extractor
     文章提取。从URL提取干净的文章内容。
+    状态: ⚠️ 有curl降级方案，可选专业工具提升效果
 
-35. news-summary
+23. news-summary
     新闻摘要。从RSS源获取和总结新闻。
+    状态: ⚠️ 基础功能零配置，语音功能需OpenAI API
 
-36. course-distiller
+24. course-distiller
     课程资料提取。从课程文件中提取考试重点。
-
+    状态: ✅ 完全可用，纯AI方法论
 
 【工作流工具】
-37. claude-md-management
-    CLAUDE.md管理。更新和改进CLAUDE.md文件。
-
-38. commit-commands
-    Git工作流。简化提交、推送、PR创建流程。
-
-39. schedule
-    定时任务。创建可定期运行的任务。
-
-40. brand-guidelines
-    品牌规范。应用Anthropic品牌颜色和排版。
-
-41. archive-cleanup
+25. archive-cleanup ⭐已修复
     归档清理。自动归档旧文档。
+    环境: WORKSPACE_DIR, ARCHIVE_AGE_DAYS (默认当前目录/7天)
+    状态: ✅ 完全可用，已修复硬编码路径
 
-42. _archive-cleanup
-    归档清理（副本）。
+26. commit-commands
+    Git工作流。简化提交、推送、PR创建流程。
+    状态: ✅ 完全可用，纯prompt
 
-43. security-guidance
+27. schedule
+    定时任务。创建可定期运行的任务。
+    状态: ✅ 完全可用，纯prompt
+
+28. security-guidance ⭐已修复
     安全指导。代码开发的安全最佳实践。
+    状态: ✅ 完全可用，已移除hooks依赖，纯静态指导
+
+
+================================================================================
+                          状态统计 (28个)
+================================================================================
+
+✅ 完全可用（零配置）: 16 个
+   archive-cleanup, security-guidance, deep-research-agent, debug-agent,
+   code-simplifier, feature-dev, pr-review-toolkit, brainstorm,
+   canvas-design, theme-factory, playground, commit-commands,
+   schedule, course-distiller, email-composer, internal-comms, doc-coauthoring
+
+⚠️  需要环境配置: 11 个
+   docx, pdf, pptx, xlsx          - 文档处理套件（需LibreOffice等）
+   code-mentor                    - Python依赖可选
+   code-review                    - GitHub CLI
+   ralph-evolver                  - Node.js 18+
+   slack-gif-creator              - Python图像处理
+   web-artifacts-builder          - Node.js前端构建
+   article-extractor              - 有降级方案
+   news-summary                   - 基础功能零配置
 
 
 ================================================================================
@@ -160,6 +163,24 @@ skill-name/
 └── 捆绑资源/              # 可选
     ├── scripts/          # 可执行脚本 (Python/Bash/Node等)
     ├── references/       # 参考文档
+    ├── themes/           # 主题文件
+    ├── canvas-fonts/     # 字体资源
     └── assets/           # 其他资源文件
+
+
+================================================================================
+                          服务器依赖配置
+================================================================================
+
+完整依赖安装指南: general-skills-dependencies.md
+
+快速安装:
+  sudo apt-get install -y libreoffice poppler-utils pandoc qpdf curl bash
+  pip install pandas openpyxl pypdf pdfplumber reportlab Pillow python-pptx
+  
+Node.js 18+ (部分skill需要):
+  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+  npm install -g docx pptxgenjs pnpm
 
 ================================================================================

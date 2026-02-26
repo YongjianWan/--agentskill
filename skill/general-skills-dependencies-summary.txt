@@ -1,0 +1,128 @@
+================================================================================
+               General Skills 服务器依赖配置 - 快速参考
+================================================================================
+
+【必须安装 - 系统级】
+--------------------------------------------------------------------------------
+Ubuntu/Debian:
+  sudo apt-get install -y libreoffice poppler-utils pandoc qpdf curl git bash
+
+CentOS/RHEL:
+  sudo yum install -y libreoffice poppler-utils pandoc qpdf curl git bash
+
+【必须安装 - Python】
+--------------------------------------------------------------------------------
+pip install pandas openpyxl pypdf pdfplumber reportlab Pillow python-pptx
+
+【必须安装 - Node.js 18+】
+--------------------------------------------------------------------------------
+# 安装Node.js 18+
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+npm install -g docx pptxgenjs pnpm
+
+【可选但推荐】
+--------------------------------------------------------------------------------
+# Python增强
+pip install pylint pytest colorama pillow imageio imageio-ffmpeg numpy trafilatura
+
+# npm增强
+npm install -g vite playwright sharp @mozilla/readability-cli
+
+# GitHub CLI（code-review需要）
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install gh -y
+
+================================================================================
+                          按Skill依赖速查表
+================================================================================
+
+✅ 完全可用 (16个，无需配置):
+  archive-cleanup, security-guidance, deep-research-agent, debug-agent,
+  code-simplifier, feature-dev, pr-review-toolkit, brainstorm,
+  canvas-design, theme-factory, playground, commit-commands,
+  schedule, course-distiller, email-composer, internal-comms, doc-coauthoring
+
+⚠️  需要环境配置 (11个):
+
+文档处理类 (docx/pdf/pptx/xlsx)
+├── 系统: libreoffice, poppler-utils, pandoc, qpdf
+├── Python: pandas, openpyxl, pypdf, pdfplumber, reportlab, Pillow, python-pptx
+└── Node: docx, pptxgenjs
+
+code-mentor
+├── Python: pylint, pytest, colorama
+└── 说明: 脚本可选，核心功能纯AI
+
+code-review
+└── 系统: gh (GitHub CLI)
+
+ralph-evolver
+└── Node: Node.js >= 18
+
+slack-gif-creator
+└── Python: pillow, imageio, imageio-ffmpeg, numpy
+
+web-artifacts-builder
+└── Node: Node.js >= 18, pnpm, vite
+
+article-extractor
+├── 系统: curl (通常已内置)
+└── 可选: trafilatura (pip) 或 @mozilla/readability-cli (npm)
+
+news-summary
+├── 系统: curl (通常已内置)
+└── 可选: OPENAI_API_KEY 环境变量（仅语音功能）
+
+================================================================================
+                          Skill状态总览 (28个)
+================================================================================
+
+✅ 完全可用（零配置）: 16 个
+   archive-cleanup       ⭐已修复（环境变量配置）
+   security-guidance     ⭐已修复（移除hooks）
+   deep-research-agent   纯AI方法论
+   debug-agent           纯AI方法论
+   code-simplifier       纯AI代码简化
+   feature-dev           纯AI功能开发工作流
+   pr-review-toolkit     纯AI PR审查
+   brainstorm            纯AI头脑风暴
+   canvas-design         字体资源已内置
+   theme-factory         主题资源已内置
+   playground            模板资源已内置
+   commit-commands       纯prompt
+   schedule              纯prompt
+   course-distiller      纯AI方法论
+   email-composer        纯模板
+   internal-comms        含示例文件
+   doc-coauthoring       纯AI工作流
+
+⚠️  需要环境配置: 11 个
+   docx, pdf, pptx, xlsx          - 文档处理套件（需LibreOffice等）
+   code-mentor                    - Python依赖可选
+   code-review                    - GitHub CLI
+   ralph-evolver                  - Node.js 18+
+   slack-gif-creator              - Python图像处理
+   web-artifacts-builder          - Node.js前端构建
+   article-extractor              - 有降级方案
+   news-summary                   - 基础功能零配置
+
+
+================================================================================
+                          修复记录
+================================================================================
+
+1. archive-cleanup
+   - 原问题: 硬编码路径 /root/.openclaw/workspace
+   - 修复: 使用环境变量 WORKSPACE_DIR（默认当前目录）
+   - 新增: ARCHIVE_AGE_DAYS, DAILY_DIR, ARCHIVE_DIR 环境变量
+
+2. security-guidance
+   - 原问题: 依赖Claude Code hooks机制
+   - 修复: 删除 hooks/ 和 .claude-plugin/ 目录
+   - 更新: 纯静态安全指导文档，添加Quick Checklist
+
+================================================================================
