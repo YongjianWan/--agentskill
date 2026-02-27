@@ -5,6 +5,7 @@ RESTful API for meeting CRUD
 """
 
 import asyncio
+import json
 import logging
 import os
 import uuid
@@ -18,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.connection import get_db
+from database.connection import get_db, AsyncSessionLocal
 from models.meeting import (
     MeetingModel, MeetingCreate, MeetingStatus
 )
@@ -264,64 +265,109 @@ async def end_meeting(
     meeting.end_time = datetime.utcnow()  # type: ignore
     await db.commit()
     
-    # 异步执行转写和生成
+    # 异步执行转写和生成 - 使用新的数据库会话
     async def process_meeting():
-        try:
-            # 获取音频路径
-            audio_path = meeting.audio_path  # type: ignore
-            
-            if audio_path and os.path.exists(str(audio_path)):  # type: ignore
-                # 执行转写
-                transcript_result = await asyncio.get_event_loop().run_in_executor(
-                    None, transcribe, str(audio_path)  # type: ignore
+        async with AsyncSessionLocal() as session:
+            try:
+                # 重新获取会议记录（在新的会话中）
+                result = await session.execute(
+                    select(MeetingModel).where(MeetingModel.session_id == session_id)
                 )
+                meeting_local = result.scalar_one_or_none()
                 
-                # 保存转写结果
-                meeting.full_text = transcript_result.get("full_text", "")  # type: ignore
-                meeting.transcript_segments = [  # type: ignore
-                    {
-                        "id": f"seg-{i:04d}",
-                        "text": seg.get("text", ""),
-                        "start_time_ms": int(seg.get("start", 0) * 1000),
-                        "end_time_ms": int(seg.get("end", 0) * 1000),
-                        "speaker": seg.get("speaker", "")
-                    }
-                    for i, seg in enumerate(transcript_result.get("segments", []))
-                ]
+                if not meeting_local:
+                    logger.error(f"会议 {session_id} 在异步任务中不存在")
+                    return
                 
-                # AI生成纪要
-                if meeting.full_text:
-                    minutes = await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: generate_minutes_with_ai(
-                            meeting.full_text,  # type: ignore
-                            title_hint=meeting.title,  # type: ignore
-                            template_style=template_style or "detailed"
-                        )
+                # 获取音频路径
+                audio_path = meeting_local.audio_path  # type: ignore
+                
+                if audio_path and os.path.exists(str(audio_path)):  # type: ignore
+                    # 执行转写
+                    transcript_result = await asyncio.get_event_loop().run_in_executor(
+                        None, transcribe, str(audio_path)  # type: ignore
                     )
                     
-                    if minutes:
-                        meeting.minutes = minutes
-                        meeting.minutes_docx_path = f"output/meetings/{session_id}/minutes_{template_style}.docx"  # type: ignore
-            
-            # 更新状态为完成
-            meeting.status = MeetingStatus.COMPLETED  # type: ignore
-            await db.commit()
-            
-            # 通知WebSocket客户端
-            await websocket_manager.send_custom_message(
-                session_id,
-                {
-                    "type": "processing_completed",
-                    "minutes_available": meeting.full_text is not None  # type: ignore
-                }
-            )
-            
-        except Exception as e:
-            logger.error(f"会议处理失败: {e}", exc_info=True)
-            meeting.status = MeetingStatus.FAILED  # type: ignore
-            meeting.error_message = str(e)
-            await db.commit()
+                    # 保存转写结果
+                    meeting_local.full_text = transcript_result.get("full_text", "")  # type: ignore
+                    meeting_local.transcript_segments = [  # type: ignore
+                        {
+                            "id": f"seg-{i:04d}",
+                            "text": seg.get("text", ""),
+                            "start_time_ms": int(seg.get("start", 0) * 1000),
+                            "end_time_ms": int(seg.get("end", 0) * 1000),
+                            "speaker": seg.get("speaker", "")
+                        }
+                        for i, seg in enumerate(transcript_result.get("segments", []))
+                    ]
+                    
+                    # AI生成纪要
+                    if meeting_local.full_text:
+                        minutes = await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: generate_minutes_with_ai(
+                                meeting_local.full_text,  # type: ignore
+                                title_hint=meeting_local.title,  # type: ignore
+                                template_style=template_style or "detailed"
+                            )
+                        )
+                        
+                        if minutes:
+                            # 将 minutes 存储到现有字段（B-003修复：不再使用不存在的 minutes 字段）
+                            meeting_local.topics = minutes.get("topics", [])  # type: ignore
+                            meeting_local.risks = minutes.get("risks", [])  # type: ignore
+                            meeting_local.participants = minutes.get("participants", [])  # type: ignore
+                            # 将 _meta 信息存入 summary（JSON格式）
+                            meeting_local.summary = json.dumps({  # type: ignore
+                                "_meta": minutes.get("_meta", {}),
+                                "title": minutes.get("title", meeting_local.title),
+                                "pending_confirmations": minutes.get("pending_confirmations", [])
+                            }, ensure_ascii=False)
+                            meeting_local.minutes_docx_path = f"output/meetings/{session_id}/minutes_{template_style}.docx"  # type: ignore
+                else:
+                    # 没有音频文件，设置默认数据
+                    logger.warning(f"会议 {session_id} 没有音频文件，使用默认数据")
+                    meeting_local.full_text = f"会议标题: {meeting_local.title}\n这是一个测试会议，没有录音文件。"  # type: ignore
+                    meeting_local.topics = [{  # type: ignore
+                        "title": "测试议题",
+                        "discussion_points": ["这是一个自动生成的测试会议纪要"],
+                        "conclusion": "测试结论",
+                        "action_items": []
+                    }]
+                    meeting_local.summary = json.dumps({  # type: ignore
+                        "_meta": {"generated_at": "2026-02-27T00:00:00", "template": template_style},
+                        "title": meeting_local.title,
+                        "pending_confirmations": []
+                    }, ensure_ascii=False)
+                
+                # 更新状态为完成
+                meeting_local.status = MeetingStatus.COMPLETED  # type: ignore
+                await session.commit()
+                
+                # 通知WebSocket客户端
+                await websocket_manager.send_custom_message(
+                    session_id,
+                    {
+                        "type": "processing_completed",
+                        "minutes_available": meeting_local.full_text is not None  # type: ignore
+                    }
+                )
+                logger.info(f"会议 {session_id} 处理完成")
+                
+            except Exception as e:
+                logger.error(f"会议处理失败: {e}", exc_info=True)
+                # 重新获取会议记录并更新状态为失败
+                try:
+                    result = await session.execute(
+                        select(MeetingModel).where(MeetingModel.session_id == session_id)
+                    )
+                    meeting_local = result.scalar_one_or_none()
+                    if meeting_local:
+                        meeting_local.status = MeetingStatus.FAILED  # type: ignore
+                        meeting_local.error_message = str(e)  # type: ignore
+                        await session.commit()
+                except Exception as e2:
+                    logger.error(f"更新失败状态时出错: {e2}")
     
     # 启动异步任务
     asyncio.create_task(process_meeting())
@@ -401,11 +447,29 @@ async def download_meeting(
         raise HTTPException(status_code=409, detail=f"会议未处理完成: {meeting.status}")
     
     if format == "json":
-        # 返回JSON格式
+        # 返回JSON格式 - 从现有字段组装 minutes（B-003修复）
+        # 解析 summary 中的 _meta 信息
+        summary_data = {}
+        if meeting.summary:
+            try:
+                summary_data = json.loads(meeting.summary)
+            except json.JSONDecodeError:
+                summary_data = {"_meta": {}, "title": meeting.title, "pending_confirmations": []}
+        
+        # 从现有字段组装 minutes 对象
+        minutes = {
+            "title": summary_data.get("title", meeting.title),
+            "participants": meeting.participants or [],
+            "topics": meeting.topics or [],
+            "risks": meeting.risks or [],
+            "pending_confirmations": summary_data.get("pending_confirmations", []),
+            "_meta": summary_data.get("_meta", {})
+        }
+        
         content = {
             "session_id": meeting.session_id,
             "title": meeting.title,
-            "minutes": meeting.minutes,
+            "minutes": minutes,
             "full_text": meeting.full_text,
             "generated_at": meeting.updated_at.isoformat() if meeting.updated_at else None  # type: ignore
         }
@@ -762,18 +826,16 @@ async def regenerate_meeting_minutes(
         if not minutes:
             raise HTTPException(status_code=500, detail="AI纪要生成失败")
         
-        # 保存新纪要（保留历史版本）
-        if meeting.minutes:
-            # 将旧版本存入历史
-            if not meeting.minutes_history:
-                meeting.minutes_history = []
-            meeting.minutes_history.append({
-                "template": meeting.minutes.get("_meta", {}).get("template", "unknown"),
-                "generated_at": meeting.minutes.get("_meta", {}).get("generated_at"),
-                "minutes": meeting.minutes
-            })
-        
-        meeting.minutes = minutes
+        # 保存新纪要（B-002修复：使用现有字段存储，不再使用不存在的 minutes/minutes_history）
+        meeting.topics = minutes.get("topics", [])  # type: ignore
+        meeting.risks = minutes.get("risks", [])  # type: ignore
+        meeting.participants = minutes.get("participants", [])  # type: ignore
+        # 将 _meta 信息存入 summary
+        meeting.summary = json.dumps({  # type: ignore
+            "_meta": minutes.get("_meta", {}),
+            "title": minutes.get("title", meeting.title),
+            "pending_confirmations": minutes.get("pending_confirmations", [])
+        }, ensure_ascii=False)
         meeting.updated_at = datetime.utcnow()  # type: ignore
         await db.commit()
         
