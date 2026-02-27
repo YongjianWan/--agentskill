@@ -13,6 +13,10 @@ from sqlalchemy.pool import NullPool
 # 数据库配置（环境变量切换）
 DB_TYPE = os.getenv("DB_TYPE", "sqlite")  # sqlite / highgo
 
+# 导入瀚高方言（如果是瀚高模式）
+if DB_TYPE == "highgo":
+    import database.highgo_dialect  # noqa: F401 - 注册方言
+
 # SQLite配置（开发环境）
 SQLITE_PATH = Path(__file__).parent.parent.parent / "data" / "meetings.db"
 
@@ -25,12 +29,12 @@ HIGHGO_DATABASE = os.getenv("HIGHGO_DATABASE", "meetings")
 
 # 构建数据库URL
 if DB_TYPE == "highgo":
-    # 瀚高 = PostgreSQL协议，端口5866
+    # 瀚高 = PostgreSQL协议，使用自定义方言处理版本兼容性
     # 密码中的特殊字符需要URL编码
     from urllib.parse import quote_plus
     ENCODED_PASSWORD = quote_plus(HIGHGO_PASSWORD)
     DATABASE_URL = (
-        f"postgresql+asyncpg://{HIGHGO_USER}:{ENCODED_PASSWORD}"
+        f"highgo+asyncpg://{HIGHGO_USER}:{ENCODED_PASSWORD}"
         f"@{HIGHGO_HOST}:{HIGHGO_PORT}/{HIGHGO_DATABASE}"
     )
     # 瀚高连接参数
