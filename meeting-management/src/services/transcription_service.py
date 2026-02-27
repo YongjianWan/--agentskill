@@ -32,6 +32,31 @@ WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "zh")  # zh/en/auto
 # 功能开关
 USE_WHISPER = os.getenv("USE_WHISPER", "true").lower() == "true"
 MOCK_TRANSCRIPTION = os.getenv("MOCK_TRANSCRIPTION", "false").lower() == "true"
+ENABLE_SIMPLIFIED_CHINESE = os.getenv("ENABLE_SIMPLIFIED_CHINESE", "true").lower() == "true"  # 繁简转换开关
+
+
+# ========== 繁简转换工具 ==========
+
+def convert_to_simplified(text: str) -> str:
+    """
+    将繁体中文转换为简体中文
+    
+    Args:
+        text: 输入文本（可能包含繁体）
+        
+    Returns:
+        简体中文文本
+    """
+    if not ENABLE_SIMPLIFIED_CHINESE or not text:
+        return text
+    
+    try:
+        import opencc
+        converter = opencc.OpenCC('t2s')  # 繁体转简体
+        return converter.convert(text)
+    except Exception as e:
+        logger.warning(f"繁简转换失败: {e}, 返回原文")
+        return text
 
 
 def _detect_device() -> str:
@@ -75,6 +100,7 @@ def log_config():
     logger.info(f"  语言: {WHISPER_LANGUAGE}")
     logger.info(f"  使用Whisper: {USE_WHISPER}")
     logger.info(f"  Mock模式: {MOCK_TRANSCRIPTION}")
+    logger.info(f"  繁简转换: {'开启' if ENABLE_SIMPLIFIED_CHINESE else '关闭'}")
     logger.info("=" * 50)
     
     # 给出建议
@@ -165,7 +191,7 @@ class MockTranscriptionService:
             end_ms = start_ms + chunk_duration - 500
             
             results.append(TranscriptionResult(
-                text=text,
+                text=convert_to_simplified(text),
                 start_ms=start_ms,
                 end_ms=end_ms,
                 speaker_id=None,  # 暂不识别说话人
@@ -291,7 +317,7 @@ class WhisperTranscriptionService:
             results = []
             for segment in segments:
                 results.append(TranscriptionResult(
-                    text=segment.text.strip(),
+                    text=convert_to_simplified(segment.text.strip()),
                     start_ms=base_timestamp_ms + int(segment.start * 1000),
                     end_ms=base_timestamp_ms + int(segment.end * 1000),
                     confidence=segment.avg_logprob

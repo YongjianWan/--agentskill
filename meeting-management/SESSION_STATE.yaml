@@ -46,6 +46,8 @@ current_session:
 # === 系统状态 ===
 system:
   phase: "phase4-complete"
+  phase5_status: "mostly-complete"  # 搜索/筛选/导出已完成，仅缺历史版本接口和跨会议全文搜索
+  phase6_status: "mostly-complete"  # 测试清单、部署文档已完成，仅缺自动化回归脚本
   # phase3.5-complete: Phase 3.5 功能补全已完成，核心链路跑通
   # 当前状态: 系统可用，可demo，等待Phase 4
   
@@ -507,11 +509,31 @@ tasks:
         - "需确认192.168.106.66服务器Nginx配置"
       
     - id: "DB-002"
-      desc: "HIGHGO_SCHEMA 支持（现有数据库+Schema部署）"
+      desc: "【已完成】瀚高数据库方言兼容性"
+      status: "completed"
+      done: "2026-02-28"
+      priority: "P1"
+      solution: "新增 src/database/highgo_dialect.py 自定义方言，继承 PGDialect_asyncpg，重写 _get_server_version_info() 解析瀚高版本字符串"
+      files:
+        - "src/database/highgo_dialect.py"
+      verify:
+        - "服务启动 ✅"
+        - "健康检查 ✅"
+        - "创建会议 ✅"
+        - "列表查询(ilike) ✅"
+        - "日期范围查询 ✅"
+        - "JSON字段读取 ✅"
+        
+    - id: "DB-003"
+      desc: "【下次会话】HIGHGO_SCHEMA 支持（Schema隔离部署）"
       status: "pending"
       priority: "P1"
       next_session: "下次会话优先实现"
-      note: "实现方式2：使用现有数据库+Schema隔离数据。需要修改 connection.py 添加schema到连接参数，修改 models.py 表结构指定schema。文档已更新，待代码实现。"
+      tasks:
+        - "修改 src/database/connection.py - 添加 schema 到连接参数"
+        - "修改 src/models/meeting.py - 表结构指定 schema"
+      goal: "在 ai_civil_servant 等现有库中创建 meeting_mgmt schema，数据与现有体系隔离"
+      note: "与 DB-002 方言兼容性是分开的两步：DB-002解决连接问题，DB-003解决数据隔离部署"
       
     - id: "TODO-008"
       desc: "【P2】Phase 4 AI纪要增强"
@@ -523,14 +545,19 @@ tasks:
       note: "根据docs/PHASE4_DESIGN.md实施，大改动"
       
     - id: "GOV-001"
-      desc: "【Phase 4附属】转写结果繁简转换"
-      status: "pending"
+      desc: "【已完成】转写结果繁简转换"
+      status: "completed"
+      done: "2026-02-28"
       priority: "high"
       tasks:
-        - "集成opencc或其他繁简转换库"
-        - "转写后自动转换为简体字"
-        - "支持配置开关"
-      note: "跟随Phase 4一起做，不单独做，约10分钟工作量"
+        - "✅ 集成opencc-python-reimplemented"
+        - "✅ 转写后自动转换为简体字"
+        - "✅ 添加ENABLE_SIMPLIFIED_CHINESE配置"
+      files:
+        - "src/services/transcription_service.py"
+        - ".env"
+        - ".env.example"
+      note: "政府场景必备。在transcription_service.py中添加convert_to_simplified函数，在Mock和Whisper转写结果返回前自动转换。默认开启，可通过环境变量关闭。"
       
     - id: "GOV-002"
       desc: "【暂缓】多租户输出目录隔离"
@@ -719,7 +746,7 @@ quickref:
 
 # === 首读流程 ===
 reading_order:
-  - file: PROJECT_CONTEXT.md
+  - file: README.md
     status: prerequisite
     purpose: "项目概况（必读）"
 
