@@ -489,6 +489,12 @@ tasks:
       status: "completed"
       done: "2026-02-27"
       note: "已添加 minutes_history JSON字段，默认空数组。regenerate接口覆盖前自动append旧版本。Phase 5历史检索基于此字段实现（版本对比、历史搜索、回滚等）。"
+    
+    - id: "DB-001"
+      desc: "瀚高数据库创建meetings库"
+      status: "pending"
+      priority: "P0"
+      note: "瀚高连接已验证成功，但meetings数据库不存在。需要在瀚高中执行: CREATE DATABASE meetings; 并授权给ai_gwy用户。现有数据库列表见SESSION_HANDOFF.md"
       
     - id: "TODO-008"
       desc: "【P2】Phase 4 AI纪要增强"
