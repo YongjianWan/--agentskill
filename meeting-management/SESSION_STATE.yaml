@@ -483,6 +483,12 @@ tasks:
         - "【2026-02-27】结合 docs/测试清单.md 1.1/5.1/8.1章节验证修复"
         - "验证转写功能正常后勾选测试清单对应项"
       note: "健康检查显示 model.loaded=false，Whisper模型未在启动时加载。需验证app.state.transcription_service是否为None。修复后需对照测试清单1.1(音频转写)、5.1(转写性能)、8.1(容错恢复)验证。下次会话第一优先级处理！"
+    
+    - id: "SCHEMA-001"
+      desc: "MeetingModel添加minutes_history字段"
+      status: "completed"
+      done: "2026-02-27"
+      note: "已添加 minutes_history JSON字段，默认空数组。regenerate接口覆盖前自动append旧版本。Phase 5历史检索基于此字段实现（版本对比、历史搜索、回滚等）。"
       
     - id: "TODO-008"
       desc: "【P2】Phase 4 AI纪要增强"

@@ -834,7 +834,19 @@ async def regenerate_meeting_minutes(
         if not minutes:
             raise HTTPException(status_code=500, detail="AI纪要生成失败")
         
-        # 保存新纪要（B-002修复：使用现有字段存储，不再使用不存在的 minutes/minutes_history）
+        # 保存旧版本到历史（如果有现有纪要数据）
+        if meeting.topics or meeting.risks:
+            history_entry = {
+                "template": meeting.summary and json.loads(meeting.summary).get("_meta", {}).get("template", "unknown") or "unknown",
+                "generated_at": datetime.utcnow().isoformat(),
+                "topics": meeting.topics or [],
+                "risks": meeting.risks or []
+            }
+            if not meeting.minutes_history:
+                meeting.minutes_history = []  # type: ignore
+            meeting.minutes_history.append(history_entry)  # type: ignore
+        
+        # 保存新纪要
         meeting.topics = minutes.get("topics", [])  # type: ignore
         meeting.risks = minutes.get("risks", [])  # type: ignore
         meeting.participants = minutes.get("participants", [])  # type: ignore
