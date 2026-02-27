@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select, desc, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from database.connection import get_db, AsyncSessionLocal
 from models.meeting import (
@@ -25,7 +26,7 @@ from models.meeting import (
 )
 from services.websocket_manager import websocket_manager
 from meeting_skill import transcribe
-from ai_minutes_generator import generate_minutes_with_ai
+from ai_minutes_generator import generate_minutes_with_ai, generate_minutes_with_fallback
 from prompts import list_templates, validate_template
 
 logger = logging.getLogger(__name__)
@@ -595,7 +596,7 @@ async def list_meetings(
         keyword_filter = or_(
             MeetingModel.title.ilike(f"%{keyword}%"),
             MeetingModel.full_text.ilike(f"%{keyword}%"),
-            MeetingModel.minutes.cast(str).ilike(f"%{keyword}%")
+            MeetingModel.summary.ilike(f"%{keyword}%")
         )
         query = query.where(keyword_filter)
     
@@ -687,6 +688,8 @@ async def update_transcript_segment(
     
     meeting.full_text = "\n".join(full_text_parts)  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
+    # 标记transcript_segments已修改（SQLAlchemy JSON字段嵌套修改追踪）
+    flag_modified(meeting, "transcript_segments")
     await db.commit()
     
     # 同步更新WebSocket会话
@@ -821,23 +824,30 @@ async def regenerate_meeting_minutes(
         )
     
     try:
-        # 重新生成纪要
+        # 重新生成纪要（使用带降级的版本，避免AI服务不可用时500错误）
         minutes = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: generate_minutes_with_ai(
+            lambda: generate_minutes_with_fallback(
                 meeting.full_text,  # type: ignore
                 title_hint=meeting.title,  # type: ignore
                 template_style=request.template_style
             )
         )
         
-        if not minutes:
-            raise HTTPException(status_code=500, detail="AI纪要生成失败")
-        
         # 保存旧版本到历史（如果有现有纪要数据）
         if meeting.topics or meeting.risks:
+            # 尝试从 summary 解析模板信息，失败则使用默认值
+            template_name = "unknown"
+            if meeting.summary:
+                try:
+                    summary_data = json.loads(meeting.summary)
+                    template_name = summary_data.get("_meta", {}).get("template", "unknown")
+                except (json.JSONDecodeError, TypeError):
+                    # summary 不是有效的 JSON，使用默认值
+                    template_name = "legacy"
+            
             history_entry = {
-                "template": meeting.summary and json.loads(meeting.summary).get("_meta", {}).get("template", "unknown") or "unknown",
+                "template": template_name,
                 "generated_at": datetime.utcnow().isoformat(),
                 "topics": meeting.topics or [],
                 "risks": meeting.risks or []
