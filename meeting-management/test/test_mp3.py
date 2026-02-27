@@ -4,7 +4,7 @@
 
 import sys
 if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8')  # type: ignore
 
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
