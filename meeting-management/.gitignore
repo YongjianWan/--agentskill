@@ -1,0 +1,39 @@
+# 日志文件
+*.log
+server*.log
+test_run*.log
+
+# 数据库文件（开发环境）
+data/*.db
+data/*.db-journal
+
+# 上传文件和输出
+data/uploads/*
+!data/uploads/.gitkeep
+output/meetings/*
+!output/meetings/.gitkeep
+
+# Python缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 环境配置（本地）
+.env
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
