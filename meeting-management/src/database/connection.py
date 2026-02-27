@@ -26,8 +26,11 @@ HIGHGO_DATABASE = os.getenv("HIGHGO_DATABASE", "meetings")
 # 构建数据库URL
 if DB_TYPE == "highgo":
     # 瀚高 = PostgreSQL协议，端口5866
+    # 密码中的特殊字符需要URL编码
+    from urllib.parse import quote_plus
+    ENCODED_PASSWORD = quote_plus(HIGHGO_PASSWORD)
     DATABASE_URL = (
-        f"postgresql+asyncpg://{HIGHGO_USER}:{HIGHGO_PASSWORD}"
+        f"postgresql+asyncpg://{HIGHGO_USER}:{ENCODED_PASSWORD}"
         f"@{HIGHGO_HOST}:{HIGHGO_PORT}/{HIGHGO_DATABASE}"
     )
     # 瀚高连接参数
