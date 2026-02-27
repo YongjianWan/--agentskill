@@ -4,13 +4,62 @@
 meta:
   project: "meeting-management"
   version: "1.2.0"
-  updated: "2026-02-27"
-  status: "Docker Ready"
+  updated: "2026-02-28"
+  status: "文档精简完成"
 ```
 
 ---
 
-## v1.2.0 (2026-02-27)
+## v1.2.0 (2026-02-28) - 文档膨胀处理
+
+**文档精简 + Swagger安全开关**
+
+### 文档体系精简
+- ✅ **归档过期文档** - SESSION_HANDOFF.md, FRONTEND_MINIMAL.md等移入archive/
+- ✅ **重命名中文文件** - 测试清单.md → TEST_CHECKLIST.md
+- ✅ **精简docs目录** - 从22个文档精简至9个核心文档
+- ✅ **统一文档入口** - 线上只保留 `/docs/api` 和 `/docs/contract`
+
+### 安全加固
+- ✅ **Swagger开关** - 新增 `DISABLE_SWAGGER` 环境变量
+- ✅ **生产环境配置** - 关闭自动生成文档，防止暴露API结构
+- ✅ **手写文档保留** - Markdown文档中心不受影响
+
+---
+
+## v1.2.0 (2026-02-27) - 文档中心与联调体验
+
+**文档中心上线 + HTTP日志 + 错误处理中间件**
+
+### 文档中心（新）- 防扯皮利器
+- ✅ **文档路由** - `/docs` 实时显示 Markdown 文档
+- ✅ **API 文档** - `/docs/api` 完整 API 规范网页版
+- ✅ **联调协议** - `/docs/contract` 前后端消息约定
+- ✅ **快速上手** - `/docs/quickstart` 10分钟接入指南
+- ✅ **问题排查** - `/docs/troubleshooting` 常见问题速查
+- ✅ **验收单** - `/docs/acceptance` 交付验收清单
+- ✅ **实时更新** - 修改 docs/*.md 刷新即生效
+
+### 中间件（新）
+- ✅ **HTTP日志中间件** - 自动记录所有请求和响应
+  - 请求方法、路径、IP、User-Agent
+  - 响应状态码、处理耗时
+  - 慢请求警告（>1秒）
+  - 响应头 `X-Request-ID` / `X-Process-Time`
+- ✅ **错误处理中间件** - 前端友好的错误响应
+  - 统一错误格式 `{code, message, data}`
+  - 错误类型和详细说明
+  - 智能解决建议
+  - 开发模式显示堆栈
+
+### DeepSeek API 配置
+- ✅ **添加 API Key** - `sk-11b1c9af3bd94656b45d47a246494772`
+- ✅ **环境变量配置** - `.env` 添加 `DEEPSEEK_API_KEY`
+- ✅ **API 凭证文档** - `docs/API_CREDENTIALS.md`
+
+---
+
+## v1.2.0 (2026-02-27) - Docker + 健康检查
 
 **Docker 部署 + 健康检查增强 + TODO-009 验收**
 

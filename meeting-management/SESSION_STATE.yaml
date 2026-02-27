@@ -7,80 +7,50 @@
 meta:
   project: "meeting-management"
   version: "1.2.0"
-  updated: "2026-02-27"
+  updated: "2026-02-28"
   
 # === 本轮更新 ===
 current_session:
-  focus: "已完成 - 下次会话优先处理FIX-016模型加载Bug（用户已更新测试清单）"
+  focus: "文档膨胀处理完成 + Swagger安全开关"
   changes:
-    - "增强 /health 接口 - 三级状态(ok/degraded/error)，暴露模型/GPU/磁盘/活跃会话/启动时间"
-    - "创建 Dockerfile - Python 3.11 slim, ffmpeg, 60s start-period"
-    - "创建 docker-compose.yml - 4个volume持久化，GPU版本注释"
-    - "创建 .dockerignore"
-    - "更新 DEPLOYMENT.md - 添加Docker部署章节"
-    - "更新 test/real/index.html - 健康检查面板适配新接口格式"
-    - "更新 BACKEND_API.md - 健康检查接口文档(v1.2.0)"
-    - "归档 PHASE4_DESIGN.md 到 archive/docs/"
-    - "创建 DOCUMENT_AUDIT.md - 文档体系评估报告"
-    - "更新 CHANGELOG.md - 添加v1.2.0 Docker+健康检查记录"
-    - "重写 README.md - 更新为当前架构，添加Docker说明"
-    - "更新 PROJECT_CONTEXT.md - Phase 4标记完成，更新版本号"
-    - "FIX: test/real/index.html localhost硬编码改为动态获取window.location.hostname"
-    - "FIX: 修复API多处response_model不匹配导致的500错误"
-    - "VERIFY: 健康检查数据源真实性验证通过（磁盘/WebSocket/模型状态均为真实读取）"
-    - "FIX: 安装opencc-python-reimplemented依赖解决Pylance导入错误"
-    - "FIX: 修复WebSocketManager/WebSocket类型定义缺失(send_json/minutes_style/broadcast_to_session)"
-    - "FIX: 修复meetings.py大量Pylance类型错误(SQLAlchemy Column类型推断问题，添加60+处#type:ignore)"
+    - "归档过期文档: SESSION_HANDOFF.md, FRONTEND_MINIMAL.md等"
+    - "重命名中文文件: 测试清单.md -> TEST_CHECKLIST.md"
+    - "精简docs目录至9个核心文档"
+    - "文档路由精简: 只保留/api和/contract"
+    - "添加DISABLE_SWAGGER环境变量，生产环境可关闭自动API文档"
+    - "更新.env.example添加安全配置说明"
   model_roadmap:
     current: "faster-whisper small (CPU)"
     temp_deployment: "保持small模型（虚拟机无GPU）"
     customer_deployment: "可切换medium/large-v3（客户有GPU）"
     future: "接入公司自研API（通过AI_PROVIDER=company）"
-  session_count: 19
+  session_count: 20
   last_session_summary: |
-    本轮完成（第19轮 - Bug修复+类型检查清理+文档更新）：
-    1. TODO-009真实场景验收完成：
-       - 基于历史数据测试4种模板输出质量
-       - 评估政府场景适配度(3.3/5)，提出prompts优化建议
-       - 验证转写链路通畅
-    2. API Bug修复（关键）：
-       - 修复7处response_model与返回格式不匹配导致的500错误
-       - 修复字段名不一致(started_at vs start_time)
-       - 修复MeetingListResponse/MeetingListItem格式错误
-       - 修复meeting.minutes不存在问题(使用action_items构造)
-       - 全部16个Swagger端点验证通过
-    3. 前端修复：
-       - test/real/index.html localhost硬编码改为window.location.hostname动态获取
-    4. 健康检查验证：
-       - 验证磁盘数据真实读取(shutil.disk_usage)
-       - 验证WebSocket活跃会话计数实时变化
-       - 验证model.loaded状态非硬编码
-       - 创建test/test_health_verify.py自动化验证脚本
-    5. Pylance类型错误清理：
-       - 安装opencc-python-reimplemented解决导入错误
-       - 添加WebSocketManager.send_json方法
-       - 添加MeetingSession.minutes_style属性  
-       - 修复meetings.py 60+处SQLAlchemy类型推断问题(#type:ignore)
-    6. 文档更新：
-       - BACKEND_API.md路径格式修复(7处//改为/{session_id})
-       - 补充PUT /transcript端点文档
-       - CHANGELOG.md添加验收记录
-       - SESSION_STATE.yaml更新任务状态
+    本轮完成（第22轮 - 文档膨胀处理）：
+    1. 文档归档：
+       - 归档 SESSION_HANDOFF.md（内容已同步到SESSION_STATE.yaml）
+       - 归档 FRONTEND_MINIMAL.md, UPDATE_SUMMARY_20260227.md, 未来方向.md
+       - 归档 BOUNDARY_FIXES.md, DEPLOYMENT.md等历史文档
+    2. 文档重命名：
+       - 测试清单.md -> TEST_CHECKLIST.md
+       - 所有中文文件已处理完毕
+    3. 文档路由精简：
+       - 线上只保留 /docs/api 和 /docs/contract
+       - 其他文档通过仓库查看
+    4. Swagger安全开关：
+       - 添加 DISABLE_SWAGGER 环境变量
+       - 生产环境可关闭自动生成的API文档，防止暴露接口结构
+       - 手写文档中心不受影响
+    5. 文档结构现状：
+       - docs/ 目录：9个核心文档
+       - archive/docs/：历史归档文档
+       - 全部英文命名，无重复信息
     
     当前状态：
-    - ✅ Phase 4完成：多模板、繁简转换、Docker部署、健康检查、真实场景验收
-    - ⚠️ FIX-016待处理：Whisper模型启动加载问题(model.loaded始终false)
+    - ✅ 文档体系已精简完毕
+    - ✅ 生产环境安全配置已添加
+    - ⚠️ FIX-016待处理：Whisper模型启动加载问题
     - ⏳ Phase 5待开始：历史检索完善
-    - 系统可正常使用，API文档与实际一致
-    3. 局域网部署配置：
-       - Windows 防火墙开放 8765 端口
-       - 服务绑定 0.0.0.0 允许外部访问
-       - DEPLOYMENT.md 文档已更新
-    
-    当前状态：
-    - 核心功能全部可用
-    - 局域网部署就绪，可供同事对接
-    - 等待 Phase 4 AI纪要生成增强
 
 # === 系统状态 ===
 system:
@@ -102,12 +72,21 @@ system:
     - "【演进路线】V1.0 基础闭环 → V1.5 实时增强 → V2.0 智能沉淀"
     - "【架构调整-2026-02-25】浏览器直连后端，Handy转备选方案"
     - "【架构重构-2026-02-26】抛弃Handy，自建转写后端（浏览器MediaRecorder → 后端Whisper）"
+    - "【文档规范-2026-02-28】docs目录只保留核心文档，历史归档archive/，生产关闭Swagger"
 
 # === 当前任务 ===
 tasks:
   active: []
   
   completed:
+    - id: "BUG-001"
+      desc: "修复 Swagger /docs 500 错误"
+      status: "completed"
+      done: "2026-02-27"
+      root_cause: "HTTP日志中间件顺序错误，在CORS之前添加导致干扰预检请求"
+      fix: "移除问题中间件，重启服务"
+      file: "docs/BUGFIX_LOG.md"
+      
     - id: "FIX-008"
       desc: "修复 WebSocketManager 清理任务启动"
       status: "completed"
@@ -342,6 +321,17 @@ tasks:
       
     # ========== 暂缓任务 ==========
     
+    - id: "API-001"
+      desc: "【新方案】浏览器自带语音转写支持"
+      status: "pending"
+      priority: "P1"
+      tasks:
+        - "设计 POST /meetings/generate 接口（接收转写文本）"
+        - "简化后端：移除WebSocket实时音频流依赖"
+        - "前端使用 Web Speech API 本地转写"
+        - "后端只负责AI纪要生成和文件导出"
+      note: "前端决定用浏览器自带转写，后端提供极简HTTP接口即可。比WebSocket方案更简单。"
+      
     - id: "TODO-004"
       desc: "【暂缓】API限流保护"
       status: "on_hold"
@@ -496,6 +486,21 @@ tasks:
       priority: "P0"
       note: "瀚高连接已验证成功，但meetings数据库不存在。需要在瀚高中执行: CREATE DATABASE meetings; 并授权给ai_gwy用户。现有数据库列表见SESSION_HANDOFF.md"
     
+    - id: "TODO-010"
+      desc: "添加HTTP请求日志中间件"
+      status: "pending"
+      priority: "P2"
+      note: "显示请求耗时、统一时间格式，便于性能分析。注意：必须在CORS之后添加，避免顺序错误导致Swagger 500。参考docs/LOG_MIDDLEWARE_GUIDE.md"
+      
+    - id: "INTEGRATION-001"
+      desc: "Nginx统一入口配置"
+      status: "pending"
+      priority: "P1"
+      note: "将meeting-management通过Nginx反向代理整合到ai_gwy_backend统一入口。当前问题：Django实际运行地址未确认(非127.0.0.1:8000)，Nginx进程未找到。暂缓实施，先用双入口方案。参考docs/NGINX_UNIFIED_ENTRY.md和docs/UNIFIED_ENTRY_DESIGN.md"
+      blocker:
+        - "需确认Django实际运行地址和端口"
+        - "需确认192.168.106.66服务器Nginx配置"
+      
     - id: "DB-002"
       desc: "HIGHGO_SCHEMA 支持（现有数据库+Schema部署）"
       status: "pending"
