@@ -325,12 +325,40 @@ curl -X POST -F "file=@meeting.mp3" -F "title=测试会议" \
 | 文档                                     | 说明                    |
 | ---------------------------------------- | ----------------------- |
 | [BACKEND_API.md](docs/BACKEND_API.md)       | API 详细规范            |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md)         | 部署指南（Docker/本地） |
+| [FRONTEND_CONTRACT.md](docs/FRONTEND_CONTRACT.md) | 前后端联调协议      |
 | [CHANGELOG.md](CHANGELOG.md)                | 版本变更记录            |
-| [DOCUMENT_AUDIT.md](docs/DOCUMENT_AUDIT.md) | 文档体系评估            |
+| [SESSION_STATE.yaml](SESSION_STATE.yaml)    | 当前任务状态            |
+
+---
+
+## AI 协作指南（给 AI 助手）
+
+> 新会话开始时请按此顺序阅读：
+
+1. **本文件** (`README.md`) — 项目定位、架构概览
+2. **`SESSION_STATE.yaml`** — 找 `tasks.next`，确认本次工作内容
+3. **按需阅读**：
+   - 接口问题 → `docs/BACKEND_API.md`
+   - 联调问题 → `docs/FRONTEND_CONTRACT.md`
+
+**会话结束时必须**：
+- 更新 `SESSION_STATE.yaml`（tasks, meta.updated）
+- 新 TODO 追加到 `CHANGELOG.md`
+- 提交 commit
+
+### 架构决策记录
+
+| 日期 | 决策项 | 选择 | 原因 |
+|------|--------|------|------|
+| 2026-02-26 | 音频源 | 浏览器MediaRecorder | 抛弃Handy，减少依赖 |
+| 2026-02-26 | 接收数据 | 音频块(bytes) | 后端自己转写，控制力强 |
+| 2026-02-26 | 存储格式 | webm（原样存储） | 不做实时转码，够用就行 |
+| 2026-02-26 | 转写触发 | 每30秒一次 | 按时间稳定，块大小不固定 |
+| 2026-02-26 | 纪要生成 | 会后全量 | 实时增量复杂度不值得 |
+| 2026-02-26 | 旧代码 | 直接删除 | 不留legacy，代码即负债 |
 
 ---
 
 **版本**: v1.2.0
-**更新**: 2026-02-27
+**更新**: 2026-02-28
 **状态**: 生产就绪，支持 Docker 部署
