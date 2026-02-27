@@ -15,15 +15,14 @@ FastAPI + WebSocket + SQLite/瀚高HighGoDB
 """
 
 import sys
-import os
 import time
 
 # Windows 控制台编码设置（解决中文路径乱码问题）
 if sys.platform == "win32":
     # 设置标准输出/错误编码为 UTF-8
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
+        sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
     # 设置 Windows 控制台代码页为 UTF-8
     try:
         import subprocess
@@ -40,7 +39,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # 添加src到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
