@@ -14,6 +14,7 @@ FastAPI + WebSocket + SQLite/瀚高HighGoDB
   HIGHGO_PASSWORD=xxx    # 瀚高密码
 """
 
+import os
 import sys
 import time
 
@@ -47,9 +48,11 @@ from api.meetings import router as meetings_router
 from api.upload import router as upload_router
 from api.system import router as system_router
 from api.websocket import router as websocket_router
+from api.docs import router as docs_router
 from database.connection import init_db
 from services.websocket_manager import websocket_manager
 from services.transcription_service import transcription_service
+from middleware import HTTPLoggerMiddleware, ErrorHandlerMiddleware
 
 
 @asynccontextmanager
@@ -85,14 +88,22 @@ async def lifespan(app: FastAPI):
     print("[BYE] Server shutting down")
 
 
+# Swagger 文档开关（生产环境建议关闭，防止暴露API结构）
+# 设置 DISABLE_SWAGGER=true 关闭自动生成的 Swagger UI
+# 手写的 Markdown 文档中心（/docs/）不受影响
+disable_swagger = os.getenv("DISABLE_SWAGGER", "false").lower() == "true"
+
 app = FastAPI(
     title="Meeting Management API",
     description="灵犀会议管理后端服务 - 实时录音转写与纪要生成",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None if disable_swagger else "/docs",
+    redoc_url=None if disable_swagger else "/redoc",
+    openapi_url=None if disable_swagger else "/openapi.json"
 )
 
-# CORS配置
+# CORS配置（必须在最前面）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -101,11 +112,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 错误处理中间件
+app.add_middleware(ErrorHandlerMiddleware, debug=True)
+
+# HTTP 请求日志中间件
+app.add_middleware(HTTPLoggerMiddleware, slow_threshold=1.0)
+
 # 注册路由
 app.include_router(meetings_router, prefix="/api/v1", tags=["meetings"])
 app.include_router(upload_router, prefix="/api/v1", tags=["upload"])
 app.include_router(system_router, prefix="/api/v1", tags=["system"])
 app.include_router(websocket_router, prefix="/api/v1", tags=["websocket"])
+app.include_router(docs_router, prefix="/docs", tags=["docs"])  # 文档路由
 
 
 @app.get("/")
@@ -116,6 +134,23 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/api/v1/health"
+    }
+
+
+@app.get("/api/v1")
+async def api_root():
+    """API v1 根路径 - 可用端点列表"""
+    return {
+        "name": "Meeting Management API v1",
+        "version": "1.2.0",
+        "endpoints": {
+            "health": "/api/v1/health",
+            "meetings": "/api/v1/meetings",
+            "upload": "/api/v1/upload",
+            "docs": "/docs",
+            "api_docs": "/docs/api",
+            "contract": "/docs/contract"
+        }
     }
 
 

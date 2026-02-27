@@ -5,6 +5,10 @@
 访问:
 - /docs/api - API接口文档
 - /docs/contract - 前后端联调协议
+
+安全说明:
+- 生产环境建议关闭此路由（ENABLE_DOCS_CENTER=false）
+- FastAPI自动生成的Swagger文档（/docs）不受影响
 """
 
 import os
@@ -12,6 +16,9 @@ import markdown
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
+
+# 文档中心开关（生产环境建议关闭）
+ENABLE_DOCS_CENTER = os.getenv("ENABLE_DOCS_CENTER", "true").lower() == "true"
 
 router = APIRouter()
 
