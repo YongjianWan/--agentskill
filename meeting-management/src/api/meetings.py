@@ -446,6 +446,14 @@ async def download_meeting(
     if meeting.status != MeetingStatus.COMPLETED:  # type: ignore
         raise HTTPException(status_code=409, detail=f"会议未处理完成: {meeting.status}")
     
+    # B-001修复: 校验format参数
+    valid_formats = ["docx", "json", "txt"]
+    if format not in valid_formats:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"无效的格式: {format}，支持的格式: {', '.join(valid_formats)}"
+        )
+    
     if format == "json":
         # 返回JSON格式 - 从现有字段组装 minutes（B-003修复）
         # 解析 summary 中的 _meta 信息
@@ -480,7 +488,7 @@ async def download_meeting(
         content = meeting.full_text or ""
         return JSONResponse(content={"text": content})
     
-    else:  # docx
+    elif format == "docx":
         # 返回Word文档
         docx_path = meeting.minutes_docx_path  # type: ignore
         if not docx_path or not os.path.exists(str(docx_path)):  # type: ignore
