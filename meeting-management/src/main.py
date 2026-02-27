@@ -70,6 +70,15 @@ async def lifespan(app: FastAPI):
     # 启动 WebSocket 管理器
     websocket_manager.start()
     
+    # 预加载 Whisper 模型（避免第一次请求时加载）
+    if transcription_service.use_whisper and transcription_service.whisper_service:
+        try:
+            print("[INFO] 预加载 Whisper 模型...")
+            await transcription_service.whisper_service._load_model()
+            print("[OK] Whisper 模型加载完成")
+        except Exception as e:
+            print(f"[WARN] Whisper 模型加载失败: {e}")
+    
     yield
     
     # 关闭时清理

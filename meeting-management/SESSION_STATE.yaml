@@ -468,9 +468,9 @@ tasks:
       
     - id: "FIX-016"
       desc: "Whisper模型启动加载问题"
-      status: "pending"
+      status: "completed"
+      done: "2026-02-27"
       priority: "P0"
-      next_session: "下次会话优先处理此Bug"
       test_checklist: "docs/测试清单.md"
       related_tests:
         - "1.1 音频转写 - 正常转写、中文识别、文件不存在等13项"

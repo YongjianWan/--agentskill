@@ -46,12 +46,12 @@
 
 | ID | 问题 | 优先级 | 状态 |
 |----|------|--------|------|
-| FIX-016 | Whisper模型启动加载问题 - `model.loaded` 始终为 `false` | P0 | ⏳ 待处理 |
+| FIX-016 | Whisper模型启动加载问题 | P0 | ✅ 已修复 |
 
-**诊断信息**:
-- 健康检查返回 `model.loaded: false`（应为 `true`）
-- 可能是 `app.state.transcription_service` 挂载问题
-- 需要检查 `main.py` lifespan 初始化
+**修复内容**:
+- 在 `main.py` lifespan 中添加模型预加载逻辑
+- 服务启动时自动调用 `_load_model()`
+- 健康检查现在正确返回 `model.loaded: true`
 
 ---
 
