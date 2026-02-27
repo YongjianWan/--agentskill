@@ -352,10 +352,14 @@ python -c "import websockets, docx, requests; print('✓ 依赖安装成功')"
 
 ```bash
 # ========== 数据库配置 ==========
+# 开发环境: SQLite (默认)
 DB_TYPE=sqlite
-# HIGHGO_HOST=localhost
-# HIGHGO_PORT=5866
-# HIGHGO_USER=highgo
+
+# 生产环境: 瀚高 HighGoDB
+# DB_TYPE=highgo
+# HIGHGO_HOST=192.168.102.129
+# HIGHGO_PORT=9310
+# HIGHGO_USER=ai_gwy
 # HIGHGO_PASSWORD=your_password
 # HIGHGO_DATABASE=meetings
 
@@ -390,7 +394,13 @@ AI_NOISE_WORDS=字幕by索兰娅,字幕,索兰娅,suolan,字幕制作,subtitle
 
 | 变量名                   | 必需 | 默认值                   | 说明                                  |
 | ------------------------ | ---- | ------------------------ | ------------------------------------- |
-| `DB_TYPE`              | ❌   | sqlite                   | 数据库类型: sqlite/highgo             |
+| **数据库配置**     |      |                          |                                       |
+| `DB_TYPE`              | ❌   | sqlite                   | 数据库类型: `sqlite` 或 `highgo`      |
+| `HIGHGO_HOST`          | ❌   | localhost                | 瀚高数据库主机地址                     |
+| `HIGHGO_PORT`          | ❌   | 5866                     | 瀚高数据库端口（默认5866）             |
+| `HIGHGO_USER`          | ❌   | highgo                   | 瀚高数据库用户名                       |
+| `HIGHGO_PASSWORD`      | ❌   | -                        | 瀚高数据库密码                         |
+| `HIGHGO_DATABASE`      | ❌   | meetings                 | 瀚高数据库名                           |
 | `PORT`                 | ❌   | 8765                     | 服务端口                              |
 | `HOST`                 | ❌   | 0.0.0.0                  | 监听地址                              |
 | **转写配置**       |      |                          |                                       |
