@@ -853,7 +853,6 @@
                 
                 ws.onmessage = async (event) => {
                     const data = JSON.parse(event.data);
-                    log(`收到消息: ${data.type}`, 'success');
                     
                     switch (data.type) {
                         case 'started':
@@ -868,12 +867,32 @@
                             updateStats();
                             break;
                             
+                        case 'progress':
+                            // 实时进度更新
+                            showProgress(data.step, data.message);
+                            break;
+                            
+                        case 'processing':
+                            log(`处理状态: ${data.message}`, 'info');
+                            showProcessingStatus(data.message);
+                            break;
+                            
                         case 'completed':
+                            hideProgress();
                             handleCompleted(data);
                             break;
                             
+                        case 'warning':
+                            // 警告消息（如降级方案）
+                            hideProgress();
+                            log(`警告: ${data.message}`, 'warn');
+                            alert(` ${data.message}\n\n建议：${data.suggestion}`);
+                            break;
+                            
                         case 'error':
+                            hideProgress();
                             log(`错误: ${data.message}`, 'error');
+                            alert(` 错误: ${data.message}`);
                             break;
                     }
                 };
@@ -1038,6 +1057,101 @@
             box.scrollTop = box.scrollHeight;
         }
         
+        // ==================== 显示进度 ====================
+        let progressOverlay = null;
+        
+        function showProgress(step, message) {
+            // 步骤映射
+            const stepLabels = {
+                'start': '开始处理',
+                'closing': '关闭文件',
+                'reading': '读取数据',
+                'transcribe_check': '检查转写',
+                'transcribing': '转写音频',
+                'transcribed': '转写完成',
+                'generating': 'AI生成纪要',
+                'generated': '纪要生成完成',
+                'saving': '导出文档',
+                'saved': '导出完成',
+                'error': '处理出错'
+            };
+            
+            const stepLabel = stepLabels[step] || step;
+            log(`[进度] ${stepLabel}: ${message}`, 'info');
+            
+            // 显示进度覆盖层
+            if (!progressOverlay) {
+                progressOverlay = document.createElement('div');
+                progressOverlay.id = 'progressOverlay';
+                progressOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                `;
+                document.body.appendChild(progressOverlay);
+            }
+            
+            progressOverlay.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    text-align: center;
+                    max-width: 400px;
+                ">
+                    <div style="
+                        width: 50px;
+                        height: 50px;
+                        border: 4px solid #f3f3f3;
+                        border-top: 4px solid #667eea;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto 20px;
+                    "></div>
+                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">
+                        正在生成会议纪要
+                    </div>
+                    <div style="color: #667eea; font-weight: 500; margin-bottom: 8px;">
+                        ${stepLabel}
+                    </div>
+                    <div style="color: #666; font-size: 14px;">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            // 添加旋转动画
+            if (!document.getElementById('spinStyle')) {
+                const style = document.createElement('style');
+                style.id = 'spinStyle';
+                style.textContent = `
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+        
+        function showProcessingStatus(message) {
+            log(`处理中: ${message}`, 'info');
+        }
+        
+        function hideProgress() {
+            if (progressOverlay) {
+                progressOverlay.remove();
+                progressOverlay = null;
+            }
+        }
+        
         // ==================== 结束会议 ====================
         async function endMeeting() {
             try {
@@ -1083,13 +1197,39 @@
         
         // ==================== 处理完成 ====================
         function handleCompleted(data) {
-            log('会议已完成！', 'success');
+            // 检查是否使用了降级方案
+            const aiFailed = data.ai_success === false;
+            const statusIcon = aiFailed ? '⚠️' : '✅';
+            const statusText = aiFailed ? '完成（使用基础模板）' : '完成';
+            
+            log(`会议${statusText}！`, aiFailed ? 'warn' : 'success');
             
             const minutesBox = document.getElementById('minutesBox');
             const minutesContent = document.getElementById('minutesContent');
             
+            // AI 状态显示
+            let aiStatusHtml = '';
+            if (aiFailed) {
+                aiStatusHtml = `
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                        <p style="color: #856404; margin: 0;">
+                            <strong>⚠️ AI生成失败</strong><br>
+                            原因: ${data.fallback_reason || '未知'}<br>
+                            已使用基础模板生成纪要
+                        </p>
+                    </div>
+                `;
+            } else {
+                aiStatusHtml = `
+                    <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 8px; padding: 10px; margin: 10px 0;">
+                        <p style="color: #155724; margin: 0;">✅ AI生成成功</p>
+                    </div>
+                `;
+            }
+            
             minutesContent.innerHTML = `
                 <p><strong>会议ID:</strong> ${data.meeting_id}</p>
+                ${aiStatusHtml}
                 <p><strong>转写长度:</strong> ${data.full_text ? data.full_text.length : 0} 字符</p>
                 <p><strong>接收 chunks:</strong> ${data.chunk_count}</p>
                 <p><strong>纪要文件:</strong> ${data.minutes_path}</p>
@@ -1101,6 +1241,13 @@
             `;
             
             minutesBox.classList.add('show');
+            
+            // 如果AI失败，显示提示
+            if (aiFailed) {
+                setTimeout(() => {
+                    alert('⚠️ 纪要生成使用了基础模板\n\n可能原因：\n1. 录音过短或无声音\n2. 麦克风权限被拒绝\n3. AI服务暂时不可用\n\n建议：\n1. 检查麦克风权限\n2. 确保会议中有有效语音\n3. 重试或联系管理员');
+                }, 100);
+            }
             
             // 关闭 WebSocket
             if (ws) {

@@ -28,6 +28,7 @@ class MeetingClient {
     this.onTranscript = options.onTranscript || null;
     this.onCompleted = options.onCompleted || null;
     this.onError = options.onError || null;
+    this.onProgress = options.onProgress || null;  // 进度回调
     this.chunkInterval = options.chunkInterval || 1000;
 
     this.ws = null;
@@ -113,6 +114,31 @@ class MeetingClient {
         }
         break;
 
+      case 'progress':
+        // 生成进度更新
+        if (this.onProgress) {
+          this.onProgress(data.step, data.message);
+        }
+        break;
+
+      case 'processing':
+        // 处理状态
+        console.log('[MeetingClient] 处理状态:', data.message);
+        break;
+
+      case 'warning':
+        // 警告消息（如AI降级）
+        console.warn('[MeetingClient] 警告:', data);
+        if (this.onError) {
+          this.onError({
+            type: 'warning',
+            code: data.code,
+            message: data.message,
+            suggestion: data.suggestion
+          });
+        }
+        break;
+
       case 'completed':
         // 会议完成
         console.log('[MeetingClient] 会议完成:', data);
@@ -122,7 +148,9 @@ class MeetingClient {
             meetingId: data.meeting_id,
             fullText: data.full_text,
             minutesPath: data.minutes_path,
-            chunkCount: data.chunk_count
+            chunkCount: data.chunk_count,
+            aiSuccess: data.ai_success,
+            fallbackReason: data.fallback_reason
           });
         }
         break;

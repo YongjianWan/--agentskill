@@ -1212,25 +1212,38 @@ def append_audio_chunk(meeting_id: str, chunk_bytes: bytes, sequence: int,
     return transcript_text
 
 
-def finalize_meeting(meeting_id: str, db_session=None) -> dict:
+def finalize_meeting(meeting_id: str, db_session=None, progress_callback=None) -> dict:
     """
     结束会议，全量转写剩余内容，生成纪要，导出Word
     
     Args:
         meeting_id: 会议ID
         db_session: 数据库会话
+        progress_callback: 进度回调函数 (step, message) -> None
     
     Returns:
         {"audio_path": "...", "minutes_path": "...", "full_text": "..."}
     """
     from models.meeting import MeetingModel, MeetingStatus
     
+    def notify(step: str, message: str):
+        """发送进度通知"""
+        print(f"[Progress] {step}: {message}")
+        if progress_callback:
+            try:
+                progress_callback(step, message)
+            except Exception as e:
+                print(f"[WARN] 进度回调失败: {e}")
+    
     print(f"[DEBUG] finalize_meeting 开始: meeting_id={meeting_id}")
+    notify("start", "开始处理会议结束流程")
     
     session = _audio_sessions.get(meeting_id)
     if session is None:
         print(f"[ERROR] finalize_meeting 失败: 会议会话不存在 {meeting_id}")
         raise ValueError(f"Meeting session not found: {meeting_id}")
+    
+    notify("closing", "正在关闭音频文件...")
     
     # ========== 第一步：关闭句柄，读数据到内存，彻底释放文件 ==========
     
@@ -1277,28 +1290,44 @@ def finalize_meeting(meeting_id: str, db_session=None) -> dict:
             audio_data = f.read()
         print(f"[DEBUG] 音频文件重试读取成功: {len(audio_data)} bytes")
     
+    notify("reading", "正在读取音频数据...")
+    
     # ========== 第二步：用内存数据处理，不再碰文件句柄 ==========
     
     # 拼接历史转写结果
     full_transcript = " ".join(transcript_parts)
     print(f"[DEBUG] 历史转写拼接: {len(full_transcript)} 字符")
+    print(f"[DEBUG] chunk_count={chunk_count}, transcript_parts={len(transcript_parts)}")
+    notify("transcribe_check", f"已缓存转写: {len(full_transcript)} 字符, 音频块: {chunk_count}")
+    
+    # 检查音频数据
+    if len(audio_data) == 0:
+        print(f"[ERROR] 音频文件为空！")
+        notify("error", "音频文件为空，请检查麦克风权限")
+    elif chunk_count == 0:
+        print(f"[ERROR] 未收到音频块！")
+        notify("error", "未收到音频数据，请检查录音是否正常")
     
     # 没转写过就全量转一次
     if not full_transcript and len(audio_data) > 0:
+        notify("transcribing", "正在转写音频内容...")
         print(f"[DEBUG] 无历史转写，执行全量转写...")
         try:
             result = transcribe_bytes(audio_data)
             full_transcript = result.get("full_text", "")
             print(f"[DEBUG] 全量转写完成: {len(full_transcript)} 字符")
+            notify("transcribed", f"转写完成: {len(full_transcript)} 字符")
         except Exception as e:
             print(f"[ERROR] 全量转写失败: {e}")
             import traceback
             traceback.print_exc()
             full_transcript = ""
+            notify("error", "转写失败")
     
     # 生成纪要
     minutes_path = Path(meeting_dir) / "minutes.docx"
     print(f"[DEBUG] 开始生成纪要，目标路径: {minutes_path}")
+    notify("generating", "正在生成会议纪要（AI处理中）...")
     
     try:
         meeting_data = generate_minutes(
@@ -1310,32 +1339,51 @@ def finalize_meeting(meeting_id: str, db_session=None) -> dict:
             detail_level="detailed"  # 使用详细版模板生成纪要
         )
         print(f"[DEBUG] generate_minutes 完成: title={meeting_data.title}, topics={len(meeting_data.topics)}")
+        notify("generated", f"纪要生成完成: {meeting_data.title}")
     except Exception as e:
         print(f"[ERROR] generate_minutes 失败: {e}")
         import traceback
         traceback.print_exc()
+        notify("error", "纪要生成失败")
         raise
     
     # 保存Word
+    notify("saving", "正在导出Word文档...")
     print(f"[DEBUG] 开始保存会议纪要...")
     try:
         files = save_meeting(meeting_data, output_dir=meeting_dir, create_version=False)
         print(f"[DEBUG] save_meeting 完成: files={files}")
+        notify("saved", "文档导出完成")
     except Exception as e:
         print(f"[ERROR] save_meeting 失败: {e}")
         import traceback
         traceback.print_exc()
+        notify("error", "文档导出失败")
         raise
     
     # 直接使用 save_meeting 生成的文件路径（避免 shutil.move 触发 WinError 32）
     actual_minutes_path = files.get("docx", minutes_path)
     print(f"[DEBUG] finalize_meeting 成功完成")
+    
+    # 检查是否使用了降级方案
+    ai_success = meeting_data.status == "ai_generated"
+    fallback_reason = ""
+    if not ai_success:
+        if len(full_transcript) == 0:
+            fallback_reason = "转写文本为空"
+        elif len(full_transcript) < 10:
+            fallback_reason = "转写文本过短"
+        else:
+            fallback_reason = "AI生成失败，使用基础模板"
+    
     return {
         "meeting_id": meeting_id,
         "audio_path": str(audio_path),
         "minutes_path": str(actual_minutes_path),
         "full_text": full_transcript,
-        "chunk_count": chunk_count
+        "chunk_count": chunk_count,
+        "ai_success": ai_success,
+        "fallback_reason": fallback_reason
     }
 
 

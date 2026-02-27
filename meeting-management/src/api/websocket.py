@@ -144,7 +144,7 @@ async def handle_end_message(session_id: str):
     """
     处理结束会议消息
     
-    关闭文件，全量转写，生成纪要
+    关闭文件，全量转写，生成纪要（带实时进度推送）
     """
     # 获取生命周期锁，确保与 start 互斥
     lifecycle_lock = _get_lifecycle_lock(session_id)
@@ -157,22 +157,58 @@ async def handle_end_message(session_id: str):
             try:
                 logger.info(f"[{session_id}] 结束会议...")
                 
+                # 定义进度回调函数（在同步代码中触发异步发送）
+                loop = asyncio.get_event_loop()
+                def progress_callback(step: str, message: str):
+                    # 使用 run_coroutine_threadsafe 在同步回调中发送消息
+                    asyncio.run_coroutine_threadsafe(
+                        websocket_manager.send_custom_message(session_id, {
+                            "type": "progress",
+                            "step": step,
+                            "message": message,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }),
+                        loop
+                    )
+                
+                # 发送开始处理消息
+                await websocket_manager.send_custom_message(session_id, {
+                    "type": "processing",
+                    "status": "started",
+                    "message": "开始生成会议纪要..."
+                })
+                
                 # 调用 meeting_skill 结束会议（同步函数用 run_in_executor）
                 from meeting_skill import finalize_meeting
                 logger.info(f"[{session_id}] 调用 finalize_meeting...")
                 result = await asyncio.get_event_loop().run_in_executor(
-                    None, finalize_meeting, session_id
+                    None, finalize_meeting, session_id, None, progress_callback
                 )
                 logger.info(f"[{session_id}] finalize_meeting 完成")
                 
                 # 发送 completed 消息
+                # 检查结果是否使用了降级方案
+                is_fallback = result.get("_ai_failed", False) if isinstance(result, dict) else False
+                fallback_reason = result.get("_fail_reason", "") if isinstance(result, dict) else ""
+                
                 await websocket_manager.send_custom_message(session_id, {
                     "type": "completed",
                     "meeting_id": session_id,
                     "full_text": result["full_text"],
                     "minutes_path": result["minutes_path"],
-                    "chunk_count": result["chunk_count"]
+                    "chunk_count": result["chunk_count"],
+                    "ai_success": not is_fallback,
+                    "fallback_reason": fallback_reason if is_fallback else None
                 })
+                
+                # 如果使用了降级方案，额外发送一个警告
+                if is_fallback:
+                    await websocket_manager.send_custom_message(session_id, {
+                        "type": "warning",
+                        "code": "AI_FALLBACK",
+                        "message": f"AI生成失败，使用基础模板: {fallback_reason}",
+                        "suggestion": "请检查：1.录音是否有声音 2.麦克风权限 3.网络连接"
+                    })
                 
                 # 关闭 WebSocket 连接
                 await websocket_manager.close_session(session_id, reason="会议正常结束")
