@@ -13,16 +13,23 @@ aiosqlite==0.20.0
 asyncpg==0.30.0  # PostgreSQL/瀚高HighGoDB异步驱动
 
 # Audio Processing
-# faster-whisper==1.1.0  # Phase 3启用
-# ffmpeg-python==0.2.0   # Phase 3启用
+faster-whisper==1.1.0
+ffmpeg-python==0.2.0
 
 # AI Integration
-# openai==1.55.0         # Phase 4启用
+requests>=2.31.0  # DeepSeek API调用
+# openai==1.55.0  # 如需OpenAI兼容接口可启用
+
+# Text Processing
+opencc-python-reimplemented==0.1.7  # 繁简转换
 
 # Utilities
 pydantic==2.10.0
 python-dotenv==1.0.1
 aiofiles==24.1.0
+
+# Document Generation
+python-docx==1.1.2
 
 # Logging
 loguru==0.7.2

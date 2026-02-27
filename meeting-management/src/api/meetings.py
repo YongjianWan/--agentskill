@@ -5,27 +5,29 @@ RESTful API for meeting CRUD
 """
 
 import asyncio
+import logging
+import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
-import json
-import os
 from pydantic import BaseModel
 from sqlalchemy import select, desc, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.connection import get_db, AsyncSessionLocal
+from database.connection import get_db
 from models.meeting import (
-    MeetingModel, MeetingCreate, MeetingResponse, MeetingResult,
-    MeetingStatus, MeetingListResponse, MeetingListItem, MeetingTranscript,
-    TranscriptSegment
+    MeetingModel, MeetingCreate, MeetingStatus
 )
 from services.websocket_manager import websocket_manager
 from meeting_skill import transcribe
 from ai_minutes_generator import generate_minutes_with_ai
+from prompts import list_templates, validate_template
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,53 +48,56 @@ def format_duration_ms(start: Optional[datetime], end: Optional[datetime]) -> in
     return int((end - start).total_seconds() * 1000)
 
 
-@router.post("/meetings", response_model=MeetingResponse)
+@router.post("/meetings")
 async def create_meeting(
     data: MeetingCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    创建会议
+    创建新会议
     
-    - 生成session_id
-    - 状态为 created
-    - 返回WebSocket连接地址
+    创建后获得 session_id，用于后续 WebSocket 连接和文件上传
     """
     session_id = generate_session_id()
     
     meeting = MeetingModel(
         session_id=session_id,
-        user_id=data.user_id,
         title=data.title,
         status=MeetingStatus.CREATED,
-        participants=data.participants,
-        location=data.location,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        user_id=data.user_id,
+        participants=data.participants or []
     )
     
     db.add(meeting)
     await db.commit()
+    await db.refresh(meeting)
     
-    return MeetingResponse(
-        session_id=session_id,
-        user_id=data.user_id,
-        title=data.title,
-        status=MeetingStatus.CREATED,
-        created_at=meeting.created_at,  # type: ignore
-        updated_at=meeting.updated_at,  # type: ignore
-        participants=data.participants,
-        location=data.location,
-        transcript_count=0
-    )
+    return {
+        "code": 0,
+        "data": {
+            "session_id": session_id,
+            "title": meeting.title,
+            "status": meeting.status,
+            "created_at": meeting.created_at.isoformat(),  # type: ignore
+            "ws_url": f"/api/v1/ws/meeting/{session_id}?user_id={data.user_id}"
+        }
+    }
 
 
-@router.get("/meetings/{session_id}", response_model=MeetingResponse)
+@router.get("/meetings/{session_id}")
 async def get_meeting(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """获取会议状态"""
+    """
+    获取会议状态和信息
+    
+    - created: 已创建，等待开始
+    - recording: 录音中
+    - paused: 暂停
+    - processing: 处理中
+    - completed: 已完成
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -101,21 +106,22 @@ async def get_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    return MeetingResponse.model_validate({
-        "session_id": meeting.session_id,
-        "user_id": meeting.user_id,
-        "title": meeting.title,
-        "status": meeting.status,
-        "created_at": meeting.created_at,
-        "updated_at": meeting.updated_at,
-        "start_time": meeting.start_time,
-        "end_time": meeting.end_time,
-        "duration_ms": format_duration_ms(meeting.start_time, meeting.end_time),
-        "participants": meeting.participants or [],
-        "location": meeting.location or "",
-        "audio_path": meeting.audio_path,
-        "transcript_count": len(meeting.transcript_segments or [])  # type: ignore
-    })
+    duration_ms = format_duration_ms(meeting.start_time, meeting.end_time)  # type: ignore
+    
+    return {
+        "code": 0,
+        "data": {
+            "session_id": meeting.session_id,
+            "title": meeting.title,
+            "status": meeting.status,
+            "duration_ms": duration_ms,
+            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,  # type: ignore
+            "transcript_count": len(meeting.transcript_segments or []),  # type: ignore
+            "has_recording": meeting.audio_path is not None,  # type: ignore
+            "created_at": meeting.created_at.isoformat(),  # type: ignore
+            "updated_at": meeting.updated_at.isoformat() if meeting.updated_at else None  # type: ignore
+        }
+    }
 
 
 @router.post("/meetings/{session_id}/start")
@@ -123,7 +129,11 @@ async def start_meeting(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """开始录音"""
+    """
+    开始会议录音
+    
+    从 created -> recording 状态
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -132,22 +142,19 @@ async def start_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    if meeting.status not in [MeetingStatus.CREATED, MeetingStatus.PAUSED]:  # type: ignore
-        raise HTTPException(status_code=409, detail=f"当前状态不允许开始: {meeting.status}")
+    if meeting.status != MeetingStatus.CREATED:  # type: ignore
+        raise HTTPException(status_code=400, detail=f"会议状态错误: {meeting.status}")
     
-    meeting.status = MeetingStatus.RECORDING  # type: ignore
-    if not meeting.start_time:  # type: ignore
-        meeting.start_time = datetime.utcnow()  # type: ignore
-    meeting.updated_at = datetime.utcnow()  # type: ignore
-    
+    meeting.status = MeetingStatus.RECORDING  # type: ignore  # type: ignore
+    meeting.start_time = datetime.utcnow()  # type: ignore
     await db.commit()
     
     return {
         "code": 0,
         "data": {
             "session_id": session_id,
-            "status": MeetingStatus.RECORDING,
-            "started_at": meeting.start_time.isoformat() if meeting.start_time else None
+            "status": "recording",
+            "start_time": meeting.start_time.isoformat()
         }
     }
 
@@ -157,7 +164,11 @@ async def pause_meeting(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """暂停录音"""
+    """
+    暂停会议录音
+    
+    从 recording -> paused 状态
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -167,18 +178,16 @@ async def pause_meeting(
         raise HTTPException(status_code=404, detail="会议不存在")
     
     if meeting.status != MeetingStatus.RECORDING:  # type: ignore
-        raise HTTPException(status_code=409, detail=f"当前状态不允许暂停: {meeting.status}")
+        raise HTTPException(status_code=400, detail=f"会议未在录音状态: {meeting.status}")
     
     meeting.status = MeetingStatus.PAUSED  # type: ignore
-    meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
     return {
         "code": 0,
         "data": {
             "session_id": session_id,
-            "status": MeetingStatus.PAUSED,
-            "duration_ms": format_duration_ms(meeting.start_time, datetime.utcnow())
+            "status": "paused"
         }
     }
 
@@ -188,7 +197,11 @@ async def resume_meeting(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """恢复录音"""
+    """
+    恢复会议录音
+    
+    从 paused -> recording 状态
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -198,107 +211,38 @@ async def resume_meeting(
         raise HTTPException(status_code=404, detail="会议不存在")
     
     if meeting.status != MeetingStatus.PAUSED:  # type: ignore
-        raise HTTPException(status_code=409, detail=f"当前状态不允许恢复: {meeting.status}")
+        raise HTTPException(status_code=400, detail=f"会议未在暂停状态: {meeting.status}")
     
     meeting.status = MeetingStatus.RECORDING  # type: ignore
-    meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
     return {
         "code": 0,
         "data": {
             "session_id": session_id,
-            "status": MeetingStatus.RECORDING,
-            "duration_ms": format_duration_ms(meeting.start_time, datetime.utcnow())
+            "status": "recording"
         }
     }
-
-
-async def generate_minutes_task(session_id: str) -> None:
-    """
-    异步生成会议纪要任务
-    
-    - 查询会议获取音频路径
-    - 调用 transcribe 转写音频
-    - 调用 generate_minutes_with_ai 生成纪要
-    - 更新会议状态为 COMPLETED
-    - 保存 topics, action_items, risks 等到数据库
-    """
-    async with AsyncSessionLocal() as db:
-        try:
-            # 查询会议
-            result = await db.execute(
-                select(MeetingModel).where(MeetingModel.session_id == session_id)
-            )
-            meeting = result.scalar_one_or_none()
-            
-            if not meeting or not meeting.audio_path:
-                print(f"[generate_minutes_task] 会议不存在或音频路径为空: {session_id}")
-                return
-            
-            # 转写音频
-            print(f"[generate_minutes_task] 开始转写音频: {meeting.audio_path}")
-            transcription_result = transcribe(meeting.audio_path)
-            full_text = transcription_result.get("text", "")
-            
-            if not full_text:
-                print(f"[generate_minutes_task] 转写结果为空: {session_id}")
-                return
-            
-            # 更新转写文本
-            meeting.full_text = full_text  # type: ignore
-            meeting.transcript_segments = transcription_result.get("segments", [])  # type: ignore
-            await db.commit()
-            
-            # 生成会议纪要
-            print(f"[generate_minutes_task] 开始生成纪要: {session_id}")
-            minutes = generate_minutes_with_ai(
-                transcription=full_text,
-                title_hint=meeting.title or ""
-            )
-            
-            if not minutes:
-                print(f"[generate_minutes_task] 纪要生成失败: {session_id}")
-                return
-            
-            # 提取 action_items（从 topics 中扁平化）
-            action_items = []
-            for topic in minutes.get("topics", []):
-                for action in topic.get("action_items", []):
-                    action_items.append({
-                        "topic": topic.get("title", ""),
-                        "action": action.get("action", ""),
-                        "owner": action.get("owner", "待定"),
-                        "deadline": action.get("deadline", "")
-                    })
-            
-            # 更新会议状态和数据
-            meeting.status = MeetingStatus.COMPLETED  # type: ignore
-            meeting.summary = minutes.get("title", "")  # type: ignore
-            meeting.topics = minutes.get("topics", [])  # type: ignore
-            meeting.action_items = action_items  # type: ignore
-            meeting.risks = minutes.get("risks", [])  # type: ignore
-            meeting.updated_at = datetime.utcnow()  # type: ignore
-            await db.commit()
-            
-            print(f"[generate_minutes_task] 纪要生成完成: {session_id}")
-            
-        except Exception as e:
-            print(f"[generate_minutes_task] 异常: {session_id}, 错误: {e}")
-            await db.rollback()
 
 
 @router.post("/meetings/{session_id}/end")
 async def end_meeting(
     session_id: str,
+    template_style: Optional[str] = Query(default="detailed", description="纪要模板风格: detailed/concise/action/executive"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    结束会议
+    结束会议并触发AI纪要生成
     
-    - 停止录音
-    - 状态变为 processing
-    - 触发AI纪要生成（异步）
+    从 recording/paused -> processing -> completed
+    异步执行：音频转写 -> AI生成 -> 保存结果
+    
+    Args:
+        template_style: 纪要模板风格
+            - detailed: 详细版（默认）
+            - concise: 简洁版
+            - action: 行动项版
+            - executive: 高管摘要版
     """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
@@ -309,33 +253,100 @@ async def end_meeting(
         raise HTTPException(status_code=404, detail="会议不存在")
     
     if meeting.status not in [MeetingStatus.RECORDING, MeetingStatus.PAUSED]:
-        raise HTTPException(status_code=409, detail=f"当前状态不允许结束: {meeting.status}")
+        raise HTTPException(status_code=400, detail=f"会议状态错误: {meeting.status}")
     
-    meeting.status = MeetingStatus.PROCESSING
+    # 验证模板风格
+    if template_style and not validate_template(template_style):
+        raise HTTPException(status_code=400, detail=f"无效的模板风格: {template_style}")
+    
+    # 更新状态为处理中
+    meeting.status = MeetingStatus.PROCESSING  # type: ignore
     meeting.end_time = datetime.utcnow()  # type: ignore
-    meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
-    # 触发AI纪要生成（异步）
-    asyncio.create_task(generate_minutes_task(session_id))
+    # 异步执行转写和生成
+    async def process_meeting():
+        try:
+            # 获取音频路径
+            audio_path = meeting.audio_path  # type: ignore
+            
+            if audio_path and os.path.exists(str(audio_path)):  # type: ignore
+                # 执行转写
+                transcript_result = await asyncio.get_event_loop().run_in_executor(
+                    None, transcribe, str(audio_path)  # type: ignore
+                )
+                
+                # 保存转写结果
+                meeting.full_text = transcript_result.get("full_text", "")  # type: ignore
+                meeting.transcript_segments = [  # type: ignore
+                    {
+                        "id": f"seg-{i:04d}",
+                        "text": seg.get("text", ""),
+                        "start_time_ms": int(seg.get("start", 0) * 1000),
+                        "end_time_ms": int(seg.get("end", 0) * 1000),
+                        "speaker": seg.get("speaker", "")
+                    }
+                    for i, seg in enumerate(transcript_result.get("segments", []))
+                ]
+                
+                # AI生成纪要
+                if meeting.full_text:
+                    minutes = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: generate_minutes_with_ai(
+                            meeting.full_text,  # type: ignore
+                            title_hint=meeting.title,  # type: ignore
+                            template_style=template_style or "detailed"
+                        )
+                    )
+                    
+                    if minutes:
+                        meeting.minutes = minutes
+                        meeting.minutes_docx_path = f"output/meetings/{session_id}/minutes_{template_style}.docx"  # type: ignore
+            
+            # 更新状态为完成
+            meeting.status = MeetingStatus.COMPLETED  # type: ignore
+            await db.commit()
+            
+            # 通知WebSocket客户端
+            await websocket_manager.send_custom_message(
+                session_id,
+                {
+                    "type": "processing_completed",
+                    "minutes_available": meeting.full_text is not None  # type: ignore
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"会议处理失败: {e}", exc_info=True)
+            meeting.status = MeetingStatus.FAILED  # type: ignore
+            meeting.error_message = str(e)
+            await db.commit()
+    
+    # 启动异步任务
+    asyncio.create_task(process_meeting())
     
     return {
         "code": 0,
         "data": {
             "session_id": session_id,
-            "status": MeetingStatus.PROCESSING,
-            "duration_ms": format_duration_ms(meeting.start_time, meeting.end_time),
-            "message": "正在生成会议纪要..."
+            "status": "processing",
+            "message": "会议处理中，请稍后查询结果",
+            "template_style": template_style
         }
     }
 
 
-@router.get("/meetings/{session_id}/result", response_model=MeetingResult)
+@router.get("/meetings/{session_id}/result")
 async def get_meeting_result(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """获取会议纪要结果"""
+    """
+    获取会议纪要和完整结果
+    
+    包含转写文本、结构化纪要、行动项等
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -344,97 +355,90 @@ async def get_meeting_result(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    return MeetingResult(
-        session_id=meeting.session_id,
-        title=meeting.title,
-        status=meeting.status,
-        duration_ms=format_duration_ms(meeting.start_time, meeting.end_time),
-        summary=meeting.summary or "",
-        topics=meeting.topics or [],
-        action_items=meeting.action_items or [],
-        risks=meeting.risks or [],
-        download_urls={
-            "docx": f"/api/v1/meetings/{session_id}/download?format=docx",
-            "json": f"/api/v1/meetings/{session_id}/download?format=json"
-        } if meeting.status == MeetingStatus.COMPLETED else {}
-    )
+    # 构造 minutes 数据（从现有字段）
+    minutes_data = {
+        "action_items": meeting.action_items or [],
+        "docx_path": meeting.minutes_docx_path
+    } if meeting.action_items or meeting.minutes_docx_path else {}  # type: ignore
+    
+    return {
+        "code": 0,
+        "data": {
+            "session_id": meeting.session_id,
+            "title": meeting.title,
+            "status": meeting.status,
+            "full_text": meeting.full_text or "",
+            "minutes": minutes_data,
+            "transcript_segments": meeting.transcript_segments or [],
+            "generated_at": meeting.updated_at.isoformat() if meeting.updated_at else None  # type: ignore
+        }
+    }
 
 
 @router.get("/meetings/{session_id}/download")
 async def download_meeting(
     session_id: str,
-    format: str = Query(..., description="文件格式: docx 或 json"),
+    format: str = Query(default="docx", description="格式: docx, json, txt"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     下载会议纪要文件
     
-    - format=docx: 下载 Word 文件
-    - format=json: 下载 JSON 格式的纪要数据
+    支持格式:
+    - docx: Word文档（默认）
+    - json: JSON数据文件
+    - txt: 纯文本转写
     """
-    # 查询会议记录
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
     meeting = result.scalar_one_or_none()
     
-    # 404: 会议不存在
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    # 400: 格式不支持
-    if format not in ["docx", "json"]:
-        raise HTTPException(status_code=400, detail="格式不支持，仅支持 docx 或 json")
+    if meeting.status != MeetingStatus.COMPLETED:  # type: ignore
+        raise HTTPException(status_code=409, detail=f"会议未处理完成: {meeting.status}")
     
-    # 409: 会议尚未完成
-    if meeting.status != MeetingStatus.COMPLETED:
-        raise HTTPException(status_code=409, detail="会议尚未完成，文件未生成")
-    
-    if format == "docx":
-        # 检查 Word 文件路径是否存在
-        if not meeting.minutes_docx_path or not os.path.exists(meeting.minutes_docx_path):
-            raise HTTPException(status_code=404, detail="Word 文件不存在")
-        
-        # 返回 Word 文件
-        return FileResponse(
-            path=meeting.minutes_docx_path,
-            filename=f"{meeting.title}_{session_id}.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    
-    else:  # format == "json"
-        # 构建 JSON 响应数据
-        json_data = {
+    if format == "json":
+        # 返回JSON格式
+        content = {
             "session_id": meeting.session_id,
             "title": meeting.title,
-            "status": meeting.status,
-            "duration_ms": format_duration_ms(meeting.start_time, meeting.end_time),
-            "summary": meeting.summary or "",
-            "topics": meeting.topics or [],
-            "action_items": meeting.action_items or [],
-            "risks": meeting.risks or [],
-            "participants": meeting.participants or [],
-            "location": meeting.location or "",
-            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
-            "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
-            "created_at": meeting.created_at.isoformat() if meeting.created_at else None,
+            "minutes": meeting.minutes,
+            "full_text": meeting.full_text,
+            "generated_at": meeting.updated_at.isoformat() if meeting.updated_at else None  # type: ignore
         }
+        return JSONResponse(content=content)
+    
+    elif format == "txt":
+        # 返回纯文本格式
+        content = meeting.full_text or ""
+        return JSONResponse(content={"text": content})
+    
+    else:  # docx
+        # 返回Word文档
+        docx_path = meeting.minutes_docx_path  # type: ignore
+        if not docx_path or not os.path.exists(str(docx_path)):  # type: ignore
+            raise HTTPException(status_code=404, detail="会议纪要文档尚未生成")
         
-        # 返回 JSON 文件
-        return JSONResponse(
-            content=json_data,
-            headers={
-                "Content-Disposition": f'attachment; filename="{meeting.title}_{session_id}.json"'
-            }
+        return FileResponse(
+            str(docx_path),  # type: ignore
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=f"{meeting.title or '会议纪要'}_{session_id}.docx"
         )
 
 
-@router.get("/meetings/{session_id}/transcript", response_model=MeetingTranscript)
-async def get_transcript(
+@router.get("/meetings/{session_id}/transcript")
+async def get_meeting_transcript(
     session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """获取完整转写文本"""
+    """
+    获取会议完整转写文本（带时间戳）
+    
+    用于前端展示时间轴和全文搜索
+    """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
     )
@@ -443,88 +447,132 @@ async def get_transcript(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    return MeetingTranscript(
-        session_id=session_id,
-        full_text=meeting.full_text or "",
-        segments=meeting.transcript_segments or []
-    )
+    segments = meeting.transcript_segments or []
+    
+    return {
+        "code": 0,
+        "data": {
+            "session_id": meeting.session_id,
+            "full_text": meeting.full_text or "",
+            "segments": [
+                {
+                    "id": seg.get("id", f"seg-{i:04d}"),
+                    "text": seg.get("text", ""),
+                    "start_time_ms": seg.get("start_time_ms", 0),
+                    "end_time_ms": seg.get("end_time_ms", 0),
+                    "speaker": seg.get("speaker", "")
+                }
+                for i, seg in enumerate(segments)  # type: ignore
+            ],
+            "language": "zh",
+            "total_segments": len(segments)  # type: ignore
+        }
+    }
 
 
-@router.get("/meetings", response_model=MeetingListResponse)
+@router.get("/meetings")
 async def list_meetings(
-    user_id: str = Query(..., description="用户ID"),
-    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
-    keyword: Optional[str] = Query(None, description="关键词搜索"),
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    keyword: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
-    """查询会议列表"""
+    """
+    获取会议列表（支持搜索和过滤）
+    
+    支持过滤:
+    - user_id: 指定用户的会议
+    - status: 会议状态
+    - start_date/end_date: 日期范围 (YYYY-MM-DD)
+    - keyword: 关键词搜索（标题、转写内容）
+    """
     # 构建查询
-    query = select(MeetingModel).where(MeetingModel.user_id == user_id)
+    query = select(MeetingModel).order_by(desc(MeetingModel.created_at))
     
-    # 日期范围过滤
+    # 应用过滤条件
+    if user_id:
+        query = query.where(MeetingModel.user_id == user_id)
+    
+    if status:
+        try:
+            status_enum = MeetingStatus(status)
+            query = query.where(MeetingModel.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的状态: {status}")
+    
     if start_date:
-        query = query.where(func.date(MeetingModel.created_at) >= start_date)
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.where(MeetingModel.created_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date格式错误，应为YYYY-MM-DD")
+    
     if end_date:
-        query = query.where(func.date(MeetingModel.created_at) <= end_date)
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+            query = query.where(MeetingModel.created_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date格式错误，应为YYYY-MM-DD")
     
-    # 关键词搜索（标题、转写文本、纪要内容）
     if keyword:
-        query = query.where(
-            or_(
-                MeetingModel.title.ilike(f"%{keyword}%"),
-                MeetingModel.full_text.ilike(f"%{keyword}%"),
-                MeetingModel.summary.ilike(f"%{keyword}%")
-            )
+        keyword_filter = or_(
+            MeetingModel.title.ilike(f"%{keyword}%"),
+            MeetingModel.full_text.ilike(f"%{keyword}%"),
+            MeetingModel.minutes.cast(str).ilike(f"%{keyword}%")
         )
+        query = query.where(keyword_filter)
     
-    # 总数
-    count_result = await db.execute(
-        select(func.count()).select_from(query.subquery())
-    )
-    total = count_result.scalar()
+    # 获取总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
     
     # 分页
-    query = query.order_by(desc(MeetingModel.created_at))
-    query = query.offset((page - 1) * page_size).limit(page_size)
+    offset = (page - 1) * page_size
+    query = query.offset(offset).limit(page_size)
     
     result = await db.execute(query)
     meetings = result.scalars().all()
     
-    # 转换为列表项
-    items = []
-    for m in meetings:
-        items.append(MeetingListItem(
-            session_id=m.session_id,
-            title=m.title,
-            date=m.created_at.strftime("%Y-%m-%d"),
-            duration_ms=format_duration_ms(m.start_time, m.end_time),
-            status=m.status,
-            action_item_count=len(m.action_items or []),
-            has_download=m.status == MeetingStatus.COMPLETED
-        ))
-    
-    return MeetingListResponse(
-        total=total,
-        page=page,
-        page_size=page_size,
-        list=items
-    )
+    return {
+        "code": 0,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "list": [
+            {
+                "session_id": m.session_id,
+                "title": m.title,
+                "date": m.created_at.strftime("%Y-%m-%d") if m.created_at else "",  # type: ignore
+                "duration_ms": format_duration_ms(m.start_time, m.end_time),  # type: ignore
+                "status": m.status,
+                "action_item_count": len(m.action_items) if m.action_items else 0,  # type: ignore
+                "has_download": bool(m.minutes_docx_path and Path(str(m.minutes_docx_path)).exists())  # type: ignore
+            }
+            for m in meetings
+        ]
+    }
 
-
-# ========== 转写文本编辑接口 ==========
 
 class TranscriptUpdateRequest(BaseModel):
-    """转写文本编辑请求"""
+    """转写片段更新请求"""
+    text: str
+
+
+class TranscriptBatchUpdateItem(BaseModel):
+    """批量更新项"""
     segment_id: str
     text: str
 
 
 class TranscriptBatchUpdateRequest(BaseModel):
-    """批量转写文本编辑请求"""
-    updates: List[TranscriptUpdateRequest]
+    """批量更新转写请求"""
+    updates: List[TranscriptBatchUpdateItem]
 
 
 @router.put("/meetings/{session_id}/transcript/{segment_id}")
@@ -535,9 +583,9 @@ async def update_transcript_segment(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    更新转写片段文本
+    更新单个转写片段
     
-    支持前端编辑转写结果后保存
+    用于前端编辑转写内容后保存
     """
     result = await db.execute(
         select(MeetingModel).where(MeetingModel.session_id == session_id)
@@ -547,33 +595,29 @@ async def update_transcript_segment(
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     
-    # 查找并更新片段
     segments = meeting.transcript_segments or []
-    updated = False
     
-    for seg in segments:
+    for seg in segments:  # type: ignore
         if seg.get("id") == segment_id:
-            seg["text"] = data.text
-            updated = True
+            seg["text"] = data.text  # type: ignore
             break
-    
-    if not updated:
-        raise HTTPException(status_code=404, detail="转写片段不存在")
+    else:
+        raise HTTPException(status_code=404, detail="片段不存在")
     
     # 更新完整文本
     full_text_parts = []
-    for seg in segments:
-        start_ms = seg.get("start_time_ms", 0)
+    for seg in sorted(segments, key=lambda x: x.get("start_time_ms", 0)):  # type: ignore
+        start_ms = seg.get("start_time_ms", 0)  # type: ignore
         minutes = start_ms // 60000
         seconds = (start_ms // 1000) % 60
         time_str = f"{minutes:02d}:{seconds:02d}"
         full_text_parts.append(f"[{time_str}] {seg['text']}")
     
-    meeting.full_text = "\n".join(full_text_parts)
+    meeting.full_text = "\n".join(full_text_parts)  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
-    # 同步更新 WebSocket 会话中的数据（如果有活跃连接）
+    # 同步更新WebSocket会话
     session = websocket_manager.get_session(session_id)
     if session:
         session.update_segment(segment_id, data.text)
@@ -582,7 +626,7 @@ async def update_transcript_segment(
         "code": 0,
         "data": {
             "segment_id": segment_id,
-            "updated": True,
+            "updated_text": data.text,
             "updated_at": meeting.updated_at.isoformat()  # type: ignore
         }
     }
@@ -611,22 +655,22 @@ async def batch_update_transcript(
     updated_count = 0
     
     for update in data.updates:
-        for seg in segments:
+        for seg in segments:  # type: ignore
             if seg.get("id") == update.segment_id:
-                seg["text"] = update.text
+                seg["text"] = update.text  # type: ignore
                 updated_count += 1
                 break
     
     # 更新完整文本
     full_text_parts = []
-    for seg in sorted(segments, key=lambda x: x.get("start_time_ms", 0)):
-        start_ms = seg.get("start_time_ms", 0)
+    for seg in sorted(segments, key=lambda x: x.get("start_time_ms", 0)):  # type: ignore
+        start_ms = seg.get("start_time_ms", 0)  # type: ignore
         minutes = start_ms // 60000
         seconds = (start_ms // 1000) % 60
         time_str = f"{minutes:02d}:{seconds:02d}"
         full_text_parts.append(f"[{time_str}] {seg['text']}")
     
-    meeting.full_text = "\n".join(full_text_parts)
+    meeting.full_text = "\n".join(full_text_parts)  # type: ignore
     meeting.updated_at = datetime.utcnow()  # type: ignore
     await db.commit()
     
@@ -644,3 +688,104 @@ async def batch_update_transcript(
             "updated_at": meeting.updated_at.isoformat()  # type: ignore
         }
     }
+
+
+# ========== Phase 4 新增 API ==========
+
+@router.get("/templates")
+async def list_meeting_templates():
+    """
+    获取会议纪要模板列表
+    
+    返回所有可用的纪要模板风格和描述
+    """
+    return {
+        "code": 0,
+        "data": list_templates()
+    }
+
+
+class RegenerateMinutesRequest(BaseModel):
+    """重新生成纪要请求"""
+    template_style: str = "detailed"  # detailed/concise/action/executive
+
+
+@router.post("/meetings/{session_id}/regenerate")
+async def regenerate_meeting_minutes(
+    session_id: str,
+    request: RegenerateMinutesRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    使用不同模板重新生成会议纪要
+    
+    适用于:
+    1. 用户对首次生成的纪要风格不满意
+    2. 需要不同风格的纪要（详细版/简洁版/行动项版等）
+    
+    Args:
+        template_style: 模板风格
+            - detailed: 详细版（完整记录）
+            - concise: 简洁版（快速阅读）
+            - action: 行动项版（任务导向）
+            - executive: 高管摘要版（决策导向）
+    """
+    result = await db.execute(
+        select(MeetingModel).where(MeetingModel.session_id == session_id)
+    )
+    meeting = result.scalar_one_or_none()
+    
+    if not meeting:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    
+    if not meeting.full_text:  # type: ignore
+        raise HTTPException(status_code=400, detail="会议转写文本为空，无法生成纪要")
+    
+    # 验证模板风格
+    if not validate_template(request.template_style):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"无效的模板风格: {request.template_style}"
+        )
+    
+    try:
+        # 重新生成纪要
+        minutes = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: generate_minutes_with_ai(
+                meeting.full_text,  # type: ignore
+                title_hint=meeting.title,  # type: ignore
+                template_style=request.template_style
+            )
+        )
+        
+        if not minutes:
+            raise HTTPException(status_code=500, detail="AI纪要生成失败")
+        
+        # 保存新纪要（保留历史版本）
+        if meeting.minutes:
+            # 将旧版本存入历史
+            if not meeting.minutes_history:
+                meeting.minutes_history = []
+            meeting.minutes_history.append({
+                "template": meeting.minutes.get("_meta", {}).get("template", "unknown"),
+                "generated_at": meeting.minutes.get("_meta", {}).get("generated_at"),
+                "minutes": meeting.minutes
+            })
+        
+        meeting.minutes = minutes
+        meeting.updated_at = datetime.utcnow()  # type: ignore
+        await db.commit()
+        
+        return {
+            "code": 0,
+            "data": {
+                "session_id": session_id,
+                "template_style": request.template_style,
+                "minutes": minutes,
+                "generated_at": datetime.utcnow().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重新生成纪要失败: {str(e)}")

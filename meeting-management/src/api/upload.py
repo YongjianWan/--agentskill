@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -53,7 +53,7 @@ def generate_session_id() -> str:
 async def _update_meeting_status(
     session_id: str, 
     status: MeetingStatus, 
-    error_msg: str = None,
+    error_msg: str | None = None,
     **kwargs
 ):
     """更新会议状态（后台任务使用）"""
@@ -65,8 +65,8 @@ async def _update_meeting_status(
             meeting = result.scalar_one_or_none()
             
             if meeting:
-                meeting.status = status
-                meeting.updated_at = datetime.utcnow()
+                meeting.status = status  # type: ignore
+                meeting.updated_at = datetime.utcnow()  # type: ignore
                 
                 # 更新其他字段
                 for key, value in kwargs.items():
@@ -129,7 +129,7 @@ async def transcribe_file_task(session_id: str, file_path: Path, title: str, use
         minutes_docx_path = files.get("docx", "")
         minutes_json_path = files.get("json", "")
         
-        print(f"[INFO] 会议纪要保存完成: {minutes_docx_path}")
+        print(f"[INFO] 会议纪要保存完成: DOCX={minutes_docx_path}, JSON={minutes_json_path}")
         
         # Step 4: 更新数据库为完成状态
         topics_data = []
@@ -329,9 +329,9 @@ async def download_meeting(
         }
     else:
         # 返回DOCX文件
-        if meeting.minutes_docx_path and Path(meeting.minutes_docx_path).exists():
+        if meeting.minutes_docx_path and Path(str(meeting.minutes_docx_path)).exists():  # type: ignore
             return FileResponse(
-                path=meeting.minutes_docx_path,
+                path=str(meeting.minutes_docx_path),  # type: ignore
                 filename=f"{meeting.title}_会议纪要.docx",
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )

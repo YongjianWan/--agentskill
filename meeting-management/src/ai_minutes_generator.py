@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 AI 会议纪要生成器
-使用 DeepSeek API 替代规则引擎
+支持多提供商（DeepSeek / 公司自研API）
 
 更新记录:
 - 2026-02-25: 添加重试机制、超时配置、详细日志
+- 2026-02-26: 添加多模板支持，AI提供商抽象层
 """
 
 import json
@@ -17,13 +18,23 @@ from datetime import datetime
 
 import requests
 
+from prompts import get_system_prompt, TEMPLATE_DESCRIPTIONS
+
 # 配置日志
 logger = logging.getLogger(__name__)
+
+# ========== AI 提供商配置 ==========
+AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")  # deepseek / company
 
 # DeepSeek API 配置
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+# 公司自研API配置（预留）
+COMPANY_API_KEY = os.getenv("COMPANY_API_KEY", "")
+COMPANY_BASE_URL = os.getenv("COMPANY_BASE_URL", "")
+COMPANY_MODEL = os.getenv("COMPANY_MODEL", "company-chat")
 
 # 请求配置
 REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "60"))  # 默认60秒
@@ -37,104 +48,22 @@ NOISE_WORDS = os.getenv("AI_NOISE_WORDS", DEFAULT_NOISE_WORDS).split(",")
 NOISE_WORDS = [w.strip() for w in NOISE_WORDS if w.strip()]
 
 
-# 详细版纪要提示词 - 包含更多细节
-DETAILED_SYSTEM_PROMPT = """你是一个专业的会议纪要撰写专家。请根据会议转写文本生成详细版的结构化会议纪要。
-
-输出格式必须是 JSON：
-{
-    "title": "会议标题（从内容中准确提取）",
-    "participants": ["参会人列表（去重）"],
-    "summary": "会议整体概述（100-200字，概括会议目的、主要讨论内容和最终结论）",
-    "topics": [
-        {
-            "title": "议题标题（简洁明了，不超过20字）",
-            "discussion_points": [
-                "讨论要点1：详细记录关键观点、数据、对比分析",
-                "讨论要点2：记录重要问答环节和不同意见",
-                "讨论要点3：保留有价值的背景信息和上下文"
-            ],
-            "conclusion": "结论（详细描述达成的共识、决策结果，没有则留空，绝不编造）",
-            "uncertain": ["不确定内容1", "需要后续确认的事项"],
-            "action_items": [
-                {
-                    "action": "具体行动描述（明确做什么，避免模糊词汇）",
-                    "owner": "负责人（使用真实姓名）",
-                    "deadline": "截止日期（YYYY-MM-DD 或相对时间）",
-                    "deliverable": "交付物描述（明确产出物）"
-                }
-            ]
+def get_ai_config() -> Dict:
+    """获取当前AI提供商配置"""
+    if AI_PROVIDER == "company" and COMPANY_API_KEY:
+        return {
+            "provider": "company",
+            "api_key": COMPANY_API_KEY,
+            "base_url": COMPANY_BASE_URL,
+            "model": COMPANY_MODEL,
         }
-    ],
-    "risks": ["风险点1（描述具体风险及影响）", "风险点2"],
-    "pending_confirmations": ["待确认事项1", "待确认事项2"],
-    "next_meeting": "下次会议安排（如有提及）"
-}
-
-详细版规则：
-1. 议题划分
-   - 按议程或主题自然划分，每个议题有明确边界
-   - 议题标题简洁但准确反映讨论内容
-
-2. 讨论要点（重点）
-   - 每个议题至少3-5条讨论要点（如有足够内容）
-   - 提取关键观点、数据、对比分析
-   - 记录重要的问答环节
-   - 保留不同意见和辩论过程
-   - 去除口语化表达但保留核心信息
-
-3. 结论
-   - 详细记录达成的共识和决策结果
-   - 包含决策依据（如有）
-   - 没有结论时留空，绝不编造
-
-4. 行动项
-   - 必须包含：做什么、谁来做、何时完成、交付物是什么
-   - 负责人使用参会人真实姓名
-   - 明确可验证的交付物标准
-   - 只提取真正的任务分配
-
-5. 风险点
-   - 识别影响项目进度或结果的具体风险
-   - 描述风险的影响程度
-   - 过滤误报
-
-6. 会议总结
-   - 100-200字概括会议整体情况
-   - 包含会议目的、主要成果、下步方向
-
-7. 不确定内容
-   - 记录信息不完整的内容
-   - 标记需要后续跟进的问题"""
-
-# 简洁版纪要提示词 - 快速概览
-CONCISE_SYSTEM_PROMPT = """你是一个高效的会议纪要助手。请根据会议转写文本生成简洁版的结构化会议纪要。
-
-输出格式必须是 JSON：
-{
-    "title": "会议标题",
-    "participants": ["参会人列表"],
-    "topics": [
-        {
-            "title": "议题标题",
-            "discussion_points": ["核心要点1", "核心要点2"],
-            "conclusion": "结论",
-            "action_items": [
-                {"action": "行动描述", "owner": "负责人", "deadline": "截止日期"}
-            ]
-        }
-    ],
-    "risks": [],
-    "pending_confirmations": []
-}
-
-简洁版规则：
-1. 高度概括，去除冗余内容
-2. 每个议题最多3条讨论要点
-3. 只记录关键决策和行动项
-4. 全文阅读时间控制在2分钟内"""
-
-# 默认使用详细版
-SYSTEM_PROMPT = DETAILED_SYSTEM_PROMPT
+    # 默认使用 DeepSeek
+    return {
+        "provider": "deepseek",
+        "api_key": DEEPSEEK_API_KEY,
+        "base_url": DEEPSEEK_BASE_URL,
+        "model": DEEPSEEK_MODEL,
+    }
 
 
 def validate_transcription(transcription: str) -> tuple[bool, str]:
@@ -226,38 +155,35 @@ def filter_noise_words(transcription: str, noise_words: Optional[List[str]] = No
 def generate_minutes_with_ai(
     transcription: str,
     title_hint: str = "",
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
-    model: Optional[str] = None,
+    template_style: str = "detailed",
     max_retries: int = MAX_RETRIES,
     timeout: int = REQUEST_TIMEOUT,
-    detail_level: str = "detailed"
+    **kwargs
 ) -> Optional[Dict]:
     """
-    使用 DeepSeek AI 生成会议纪要（带重试机制）
+    使用 AI 生成会议纪要（带重试机制）
     
     Args:
         transcription: 会议转写文本
         title_hint: 会议标题提示
-        api_key: DeepSeek API Key（默认从环境变量读取）
-        base_url: API 基础 URL
-        model: 模型名称
+        template_style: 模板风格，"detailed"/"concise"/"action"/"executive"
         max_retries: 最大重试次数
         timeout: 请求超时时间（秒）
-        detail_level: 纪要详细程度，"detailed"(详细) 或 "concise"(简洁)
         
     Returns:
         会议纪要字典，失败返回 None
     """
     # 选择提示词
-    if detail_level == "concise":
-        system_prompt = CONCISE_SYSTEM_PROMPT
-    else:
-        system_prompt = DETAILED_SYSTEM_PROMPT
-    # 参数准备
-    api_key = api_key or DEEPSEEK_API_KEY
-    base_url = base_url or DEEPSEEK_BASE_URL
-    model = model or DEEPSEEK_MODEL
+    system_prompt = get_system_prompt(template_style)
+    
+    # 获取AI配置
+    config = get_ai_config()
+    api_key = config["api_key"]
+    base_url = config["base_url"]
+    model = config["model"]
+    provider = config["provider"]
+    
+    logger.info(f"使用AI提供商: {provider}, 模板: {template_style}")
     
     # 验证 API Key
     if not api_key:
@@ -348,6 +274,14 @@ def generate_minutes_with_ai(
             # 标准化字段
             minutes = normalize_minutes(minutes, title_hint)
             
+            # 添加生成元数据
+            minutes["_meta"] = {
+                "generated_at": datetime.now().isoformat(),
+                "provider": provider,
+                "model": model,
+                "template": template_style,
+            }
+            
             logger.info(f"AI 纪要生成成功: {len(minutes.get('topics', []))} 个议题, "
                        f"{sum(len(t.get('action_items', [])) for t in minutes.get('topics', []))} 个行动项")
             
@@ -414,8 +348,8 @@ def normalize_minutes(minutes: Dict, title_hint: str = "") -> Dict:
             action.setdefault("deadline", "")
     
     # 添加元数据
-    minutes["_generated_at"] = datetime.now().isoformat()
-    minutes["_generator"] = "deepseek-ai"
+    minutes.setdefault("_meta", {})
+    minutes["_meta"]["normalized_at"] = datetime.now().isoformat()
     
     return minutes
 

@@ -299,6 +299,277 @@
             color: #666;
             margin-top: 5px;
         }
+        
+        /* API 面板样式 */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .tab-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #f8f9fa;
+            color: #666;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn:hover {
+            background: #e9ecef;
+        }
+        
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-panel {
+            display: none;
+        }
+        
+        .tab-panel.active {
+            display: block;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8eeff;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .upload-status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .upload-status.show {
+            display: block;
+        }
+        
+        .upload-status.uploading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .upload-status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .meeting-list {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .meeting-item {
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .meeting-item:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+        }
+        
+        .meeting-item.selected {
+            background: #e8eeff;
+            border-color: #667eea;
+        }
+        
+        .meeting-info h4 {
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: #333;
+        }
+        
+        .meeting-info p {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .meeting-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-recording {
+            background: #cce5ff;
+            color: #004085;
+        }
+        
+        .template-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .template-card {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .template-card:hover {
+            border-color: #667eea;
+        }
+        
+        .template-card.selected {
+            border-color: #667eea;
+            background: #e8eeff;
+        }
+        
+        .template-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .template-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .template-desc {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .api-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .api-response {
+            margin-top: 20px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #333;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .api-response pre {
+            padding: 15px;
+            color: #4ec9b0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 0;
+        }
+        
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+        
+        /* 健康检查卡片样式 */
+        .health-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .health-card-title {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -319,7 +590,7 @@
                 <div class="section-title">连接配置</div>
                 <div class="input-group">
                     <label>服务器地址</label>
-                    <input type="text" id="wsUrl" value="ws://localhost:8765/api/v1/ws/meeting/" placeholder="ws://localhost:8765/api/v1/ws/meeting/">
+                    <input type="text" id="wsUrl" placeholder="ws://localhost:8765/api/v1/ws/meeting/">
                 </div>
                 <div class="input-group">
                     <label>会议标题</label>
@@ -381,6 +652,114 @@
                 </div>
             </div>
             
+            <!-- API 测试控制台 -->
+            <div class="section">
+                <div class="section-title" style="cursor: pointer;" onclick="toggleApiPanel()">
+                    <span id="apiPanelIcon">▶</span> API 测试控制台
+                </div>
+                <div id="apiPanel" style="display: none;">
+                    <!-- REST API 配置 -->
+                    <div class="input-group">
+                        <label>REST API Base URL</label>
+                        <input type="text" id="apiBaseUrl" value="http://localhost:8765/api/v1" placeholder="http://localhost:8765/api/v1">
+                    </div>
+                    
+                    <!-- 标签页 -->
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="switchTab('health')">健康检查</button>
+                        <button class="tab-btn" onclick="switchTab('meetings')">会议列表</button>
+                        <button class="tab-btn" onclick="switchTab('upload')">文件上传</button>
+                        <button class="tab-btn" onclick="switchTab('current')">当前会议</button>
+                    </div>
+                    
+                    <!-- 健康检查面板 -->
+                    <div class="tab-panel active" id="panel-health">
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="checkHealth()">
+                                <span>🏥</span> 检查健康状态
+                            </button>
+                        </div>
+                        <div class="api-result" id="healthResult"></div>
+                    </div>
+                    
+                    <!-- 会议列表面板 -->
+                    <div class="tab-panel" id="panel-meetings">
+                        <div class="input-group">
+                            <label>搜索关键词</label>
+                            <input type="text" id="searchKeyword" placeholder="输入关键词搜索">
+                        </div>
+                        <div class="input-group">
+                            <label>开始日期</label>
+                            <input type="date" id="searchStartDate">
+                        </div>
+                        <div class="input-group">
+                            <label>结束日期</label>
+                            <input type="date" id="searchEndDate">
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="fetchMeetings()">
+                                <span>📋</span> 获取会议列表
+                            </button>
+                        </div>
+                        <div class="meeting-list" id="meetingList"></div>
+                    </div>
+                    
+                    <!-- 文件上传面板 -->
+                    <div class="tab-panel" id="panel-upload">
+                        <div class="input-group">
+                            <label>会议标题</label>
+                            <input type="text" id="uploadTitle" placeholder="上传音频的会议标题">
+                        </div>
+                        <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" onclick="document.getElementById('fileInput').click()">
+                            <div class="upload-icon">📁</div>
+                            <div class="upload-text">点击或拖拽音频文件到此处</div>
+                            <div class="upload-hint">支持 MP3, WAV, M4A, WEBM</div>
+                            <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.webm" style="display: none;" onchange="handleFileSelect(event)">
+                        </div>
+                        <div class="upload-status" id="uploadStatus"></div>
+                    </div>
+                    
+                    <!-- 当前会议面板 -->
+                    <div class="tab-panel" id="panel-current">
+                        <div class="input-group">
+                            <label>当前会议ID</label>
+                            <input type="text" id="currentMeetingId" readonly placeholder="开始会议后会自动填充">
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="fetchMeetingDetail()" id="btnDetail" disabled>
+                                <span>📄</span> 获取详情
+                            </button>
+                            <button class="btn btn-primary" onclick="fetchTemplates()">
+                                <span>🎨</span> 模板列表
+                            </button>
+                            <button class="btn btn-primary" onclick="showRegenerateDialog()" id="btnRegenerate" disabled>
+                                <span>🔄</span> 重新生成
+                            </button>
+                            <button class="btn btn-primary" onclick="downloadMinutes('docx')" id="btnDownloadDocx" disabled>
+                                <span>📥</span> 下载 Word
+                            </button>
+                            <button class="btn btn-primary" onclick="downloadMinutes('json')" id="btnDownloadJson" disabled>
+                                <span>📥</span> 下载 JSON
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteMeeting()" id="btnDelete" disabled>
+                                <span>🗑️</span> 删除
+                            </button>
+                        </div>
+                        <div class="template-list" id="templateList"></div>
+                        <div class="api-result" id="meetingDetail"></div>
+                    </div>
+                    
+                    <!-- API 响应显示 -->
+                    <div class="api-response" id="apiResponse" style="display: none;">
+                        <div class="response-header">
+                            <span>API 响应</span>
+                            <button class="btn btn-sm" onclick="clearApiResponse()">清除</button>
+                        </div>
+                        <pre id="apiResponseBody"></pre>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 日志 -->
             <div class="section">
                 <div class="section-title">系统日志</div>
@@ -403,6 +782,11 @@
         let transcriptCount = 0;
         let startTime = null;
         let isRecording = false;
+        
+        // ==================== 动态配置 ====================
+        const host = window.location.hostname;
+        const defaultWsUrl = `ws://${host}:8765/api/v1/ws/meeting/`;
+        document.getElementById('wsUrl').value = defaultWsUrl;
         
         // ==================== 日志工具 ====================
         function log(message, type = 'info') {
@@ -727,6 +1111,483 @@
         
         // ==================== 页面加载完成 ====================
         log('页面加载完成，等待开始会议...', 'info');
+        
+        // ==================== API 测试控制台功能 ====================
+        let selectedMeetingId = null;
+        let selectedTemplate = 'detailed';
+        let templates = [];
+        
+        function toggleApiPanel() {
+            const panel = document.getElementById('apiPanel');
+            const icon = document.getElementById('apiPanelIcon');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                panel.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+        
+        function switchTab(tabName) {
+            // 更新按钮状态
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 更新面板显示
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById('panel-' + tabName).classList.add('active');
+        }
+        
+        function getApiBaseUrl() {
+            return document.getElementById('apiBaseUrl').value.replace(/\/$/, '');
+        }
+        
+        function getUserId() {
+            return document.getElementById('userId').value || 'user_test';
+        }
+        
+        function showApiResponse(data) {
+            const responseDiv = document.getElementById('apiResponse');
+            const bodyPre = document.getElementById('apiResponseBody');
+            bodyPre.textContent = JSON.stringify(data, null, 2);
+            responseDiv.style.display = 'block';
+        }
+        
+        function clearApiResponse() {
+            document.getElementById('apiResponse').style.display = 'none';
+            document.getElementById('apiResponseBody').textContent = '';
+        }
+        
+        // 健康检查
+        async function checkHealth() {
+            try {
+                log('检查健康状态...', 'info');
+                const baseUrl = getApiBaseUrl();
+                const response = await fetch(`${baseUrl}/system/health`);
+                const data = await response.json();
+                
+                const healthData = data.data;
+                const components = healthData?.components || {};
+                
+                // 状态颜色映射
+                const statusColors = {
+                    'ok': '#28a745',
+                    'degraded': '#ffc107',
+                    'error': '#dc3545'
+                };
+                
+                const overallStatus = healthData?.status || 'unknown';
+                const statusColor = statusColors[overallStatus] || '#666';
+                
+                const resultDiv = document.getElementById('healthResult');
+                resultDiv.innerHTML = `
+                    <div style="margin-bottom: 15px; padding: 10px; background: ${statusColor}20; border-radius: 6px; border-left: 4px solid ${statusColor}">
+                        <div style="color: ${statusColor}; font-size: 18px; font-weight: bold;">
+                            ● 整体状态: ${overallStatus.toUpperCase()}
+                        </div>
+                        <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                            版本: ${healthData?.version || 'unknown'} | 
+                            运行时间: ${formatUptime(healthData?.uptime_seconds || 0)}
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <div class="health-card">
+                            <div class="health-card-title">🖥️ API 服务</div>
+                            <div style="color: ${statusColors[components.api?.status] || '#666'}">
+                                ${components.api?.status || 'unknown'}
+                            </div>
+                        </div>
+                        
+                        <div class="health-card">
+                            <div class="health-card-title">💾 数据库</div>
+                            <div style="color: ${statusColors[components.database?.status] || '#666'}">
+                                ${components.database?.status || 'unknown'}
+                            </div>
+                        </div>
+                        
+                        <div class="health-card">
+                            <div class="health-card-title">🤖 模型</div>
+                            <div style="color: ${statusColors[components.model?.status] || '#666'}">
+                                ${components.model?.status || 'unknown'}
+                            </div>
+                            <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                                ${components.model?.name || '-'} | ${components.model?.device || '-'}
+                                ${components.model?.gpu_available ? ' | GPU' : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="health-card">
+                            <div class="health-card-title">💽 磁盘</div>
+                            <div style="color: ${statusColors[components.disk?.status] || '#666'}">
+                                ${components.disk?.status || 'unknown'}
+                            </div>
+                            <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                                ${components.disk?.free_gb?.toFixed(1) || '-'} GB 可用 / 
+                                ${components.disk?.usage_percent?.toFixed(0) || '-'}% 使用
+                            </div>
+                        </div>
+                        
+                        <div class="health-card">
+                            <div class="health-card-title">🌐 WebSocket</div>
+                            <div style="color: #28a745;">
+                                ${components.websocket?.active_sessions || 0} 活跃会话
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                showApiResponse(data);
+                log(`健康检查完成: ${overallStatus}`, overallStatus === 'ok' ? 'success' : 'warn');
+            } catch (error) {
+                log(`健康检查失败: ${error.message}`, 'error');
+                document.getElementById('healthResult').innerHTML = `<div style="color: #dc3545">检查失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 格式化运行时间
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${seconds}秒`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟`;
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            return `${hours}小时${mins}分钟`;
+        }
+        
+        // 获取会议列表
+        async function fetchMeetings() {
+            try {
+                log('获取会议列表...', 'info');
+                const baseUrl = getApiBaseUrl();
+                const userId = getUserId();
+                const keyword = document.getElementById('searchKeyword').value;
+                const startDate = document.getElementById('searchStartDate').value;
+                const endDate = document.getElementById('searchEndDate').value;
+                
+                let url = `${baseUrl}/meetings?user_id=${userId}`;
+                if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+                if (startDate) url += `&start_date=${startDate}`;
+                if (endDate) url += `&end_date=${endDate}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                renderMeetingList(data.data?.list || []);
+                showApiResponse(data);
+                log(`获取到 ${data.data?.total || 0} 个会议`, 'success');
+            } catch (error) {
+                log(`获取会议列表失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function renderMeetingList(meetings) {
+            const listDiv = document.getElementById('meetingList');
+            if (meetings.length === 0) {
+                listDiv.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无会议</div>';
+                return;
+            }
+            
+            listDiv.innerHTML = meetings.map(m => `
+                <div class="meeting-item ${selectedMeetingId === m.session_id ? 'selected' : ''}" onclick="selectMeeting('${m.session_id}')">
+                    <div class="meeting-info">
+                        <h4>${m.title || '未命名会议'}</h4>
+                        <p>${m.date} | ${formatDuration(m.duration_ms)} | ${m.session_id}</p>
+                    </div>
+                    <span class="meeting-status status-${m.status}">${m.status}</span>
+                </div>
+            `).join('');
+        }
+        
+        function formatDuration(ms) {
+            if (!ms) return '0s';
+            const seconds = Math.floor(ms / 1000);
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+        }
+        
+        function selectMeeting(meetingId) {
+            selectedMeetingId = meetingId;
+            document.getElementById('currentMeetingId').value = meetingId;
+            
+            // 启用按钮
+            document.getElementById('btnDetail').disabled = false;
+            document.getElementById('btnRegenerate').disabled = false;
+            document.getElementById('btnDownloadDocx').disabled = false;
+            document.getElementById('btnDownloadJson').disabled = false;
+            document.getElementById('btnDelete').disabled = false;
+            
+            // 更新列表选中状态
+            document.querySelectorAll('.meeting-item').forEach(item => {
+                item.classList.toggle('selected', item.textContent.includes(meetingId));
+            });
+            
+            log(`选中会议: ${meetingId}`, 'info');
+        }
+        
+        // 获取会议详情
+        async function fetchMeetingDetail() {
+            if (!selectedMeetingId) {
+                alert('请先选择一个会议');
+                return;
+            }
+            
+            try {
+                log(`获取会议详情: ${selectedMeetingId}...`, 'info');
+                const baseUrl = getApiBaseUrl();
+                const userId = getUserId();
+                const response = await fetch(`${baseUrl}/meetings/${selectedMeetingId}?user_id=${userId}`);
+                const data = await response.json();
+                
+                const detailDiv = document.getElementById('meetingDetail');
+                if (data.code === 0) {
+                    detailDiv.innerHTML = `
+                        <h4>${data.data?.title || '未命名'}</h4>
+                        <p><strong>ID:</strong> ${data.data?.session_id}</p>
+                        <p><strong>状态:</strong> ${data.data?.status}</p>
+                        <p><strong>时长:</strong> ${formatDuration(data.data?.duration_ms)}</p>
+                        <p><strong>转写片段:</strong> ${data.data?.transcript_count || 0}</p>
+                        <p><strong>有录音:</strong> ${data.data?.has_recording ? '是' : '否'}</p>
+                    `;
+                }
+                
+                showApiResponse(data);
+                log('会议详情获取成功', 'success');
+            } catch (error) {
+                log(`获取会议详情失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 获取模板列表
+        async function fetchTemplates() {
+            try {
+                log('获取模板列表...', 'info');
+                const baseUrl = getApiBaseUrl();
+                const response = await fetch(`${baseUrl}/templates`);
+                const data = await response.json();
+                
+                templates = data.data || [];
+                renderTemplates();
+                showApiResponse(data);
+                log(`获取到 ${templates.length} 个模板`, 'success');
+            } catch (error) {
+                log(`获取模板列表失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function renderTemplates() {
+            const listDiv = document.getElementById('templateList');
+            listDiv.innerHTML = templates.map(t => `
+                <div class="template-card ${selectedTemplate === t.id ? 'selected' : ''}" onclick="selectTemplate('${t.id}')">
+                    <div class="template-icon">${t.icon || '📄'}</div>
+                    <div class="template-name">${t.name}</div>
+                    <div class="template-desc">${t.description || ''}</div>
+                </div>
+            `).join('');
+        }
+        
+        function selectTemplate(templateId) {
+            selectedTemplate = templateId;
+            renderTemplates();
+            log(`选择模板: ${templateId}`, 'info');
+        }
+        
+        function showRegenerateDialog() {
+            if (!selectedMeetingId) {
+                alert('请先选择一个会议');
+                return;
+            }
+            if (templates.length === 0) {
+                fetchTemplates().then(() => {
+                    alert('请选择模板后，再次点击重新生成按钮');
+                });
+                return;
+            }
+            regenerateMinutes();
+        }
+        
+        // 重新生成纪要
+        async function regenerateMinutes() {
+            if (!selectedMeetingId) return;
+            
+            try {
+                log(`重新生成纪要: ${selectedMeetingId}, 模板: ${selectedTemplate}...`, 'info');
+                const baseUrl = getApiBaseUrl();
+                const response = await fetch(`${baseUrl}/meetings/${selectedMeetingId}/regenerate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template_style: selectedTemplate })
+                });
+                const data = await response.json();
+                
+                showApiResponse(data);
+                log('重新生成请求已发送', 'success');
+            } catch (error) {
+                log(`重新生成失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 下载纪要
+        function downloadMinutes(format) {
+            if (!selectedMeetingId) {
+                alert('请先选择一个会议');
+                return;
+            }
+            
+            const baseUrl = getApiBaseUrl();
+            const url = `${baseUrl}/meetings/${selectedMeetingId}/download?format=${format}`;
+            log(`下载纪要: ${format}...`, 'info');
+            window.open(url, '_blank');
+        }
+        
+        // 删除会议
+        async function deleteMeeting() {
+            if (!selectedMeetingId) {
+                alert('请先选择一个会议');
+                return;
+            }
+            
+            if (!confirm(`确定要删除会议 ${selectedMeetingId} 吗？`)) {
+                return;
+            }
+            
+            try {
+                log(`删除会议: ${selectedMeetingId}...`, 'info');
+                const baseUrl = getApiBaseUrl();
+                const userId = getUserId();
+                const response = await fetch(`${baseUrl}/meetings/${selectedMeetingId}?user_id=${userId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                showApiResponse(data);
+                log('会议已删除', 'success');
+                
+                // 清除选中状态
+                selectedMeetingId = null;
+                document.getElementById('currentMeetingId').value = '';
+                document.getElementById('btnDetail').disabled = true;
+                document.getElementById('btnRegenerate').disabled = true;
+                document.getElementById('btnDownloadDocx').disabled = true;
+                document.getElementById('btnDownloadJson').disabled = true;
+                document.getElementById('btnDelete').disabled = true;
+                
+                // 刷新列表
+                fetchMeetings();
+            } catch (error) {
+                log(`删除失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 文件上传处理
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('uploadArea').classList.add('dragover');
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('uploadArea').classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        }
+        
+        async function uploadFile(file) {
+            const statusDiv = document.getElementById('uploadStatus');
+            const title = document.getElementById('uploadTitle').value || file.name;
+            
+            // 验证文件类型
+            const validTypes = ['.mp3', '.wav', '.m4a', '.webm'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (!validTypes.includes(ext)) {
+                statusDiv.className = 'upload-status error show';
+                statusDiv.innerHTML = `❌ 不支持的文件类型: ${ext}`;
+                return;
+            }
+            
+            try {
+                statusDiv.className = 'upload-status uploading show';
+                statusDiv.innerHTML = `
+                    <div>📤 正在上传: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                `;
+                
+                const baseUrl = getApiBaseUrl();
+                const userId = getUserId();
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('title', title);
+                formData.append('user_id', userId);
+                
+                // 模拟进度
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress = Math.min(progress + 10, 90);
+                    statusDiv.querySelector('.progress-fill').style.width = progress + '%';
+                }, 200);
+                
+                const response = await fetch(`${baseUrl}/upload/audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                clearInterval(progressInterval);
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    statusDiv.className = 'upload-status success show';
+                    statusDiv.innerHTML = `
+                        <div>✅ 上传成功！</div>
+                        <div>会议ID: ${data.data?.session_id}</div>
+                        <div>状态: ${data.data?.status}</div>
+                    `;
+                    log(`文件上传成功: ${data.data?.session_id}`, 'success');
+                    
+                    // 自动选中这个会议
+                    selectMeeting(data.data?.session_id);
+                } else {
+                    throw new Error(data.message || '上传失败');
+                }
+                
+                showApiResponse(data);
+            } catch (error) {
+                statusDiv.className = 'upload-status error show';
+                statusDiv.innerHTML = `❌ 上传失败: ${error.message}`;
+                log(`文件上传失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 更新当前会议ID（从WebSocket会议）
+        const originalHandleCompleted = handleCompleted;
+        handleCompleted = function(data) {
+            originalHandleCompleted(data);
+            if (data.meeting_id) {
+                document.getElementById('currentMeetingId').value = data.meeting_id;
+                selectMeeting(data.meeting_id);
+            }
+        };
+        
+        // 设置默认日期范围
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+        document.getElementById('searchEndDate').value = today.toISOString().split('T')[0];
+        document.getElementById('searchStartDate').value = lastMonth.toISOString().split('T')[0];
     </script>
 </body>
 </html>

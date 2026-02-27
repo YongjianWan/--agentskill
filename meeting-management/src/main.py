@@ -16,6 +16,7 @@ FastAPI + WebSocket + SQLite/瀚高HighGoDB
 
 import sys
 import os
+import time
 
 # Windows 控制台编码设置（解决中文路径乱码问题）
 if sys.platform == "win32":
@@ -49,11 +50,19 @@ from api.system import router as system_router
 from api.websocket import router as websocket_router
 from database.connection import init_db
 from services.websocket_manager import websocket_manager
+from services.transcription_service import transcription_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    # 记录启动时间
+    app.state.startup_time = time.time()
+    
+    # 存储服务实例到 app.state，供健康检查使用
+    app.state.transcription_service = transcription_service
+    app.state.websocket_manager = websocket_manager
+    
     # 启动时初始化数据库
     await init_db()
     print("[OK] Database initialized")

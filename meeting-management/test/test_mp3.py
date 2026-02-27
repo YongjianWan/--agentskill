@@ -9,7 +9,7 @@ if sys.platform == 'win32':
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from meeting_skill import transcribe
+from src.meeting_skill import transcribe
 import time
 
 mp3_path = r'C:\Users\sdses\Desktop\神思\ai孪生\agentp平台skill\meeting-management\test\周四 10点19分.mp3'

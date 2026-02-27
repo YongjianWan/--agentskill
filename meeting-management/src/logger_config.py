@@ -14,9 +14,10 @@ Usage:
 
 import json
 import logging
+import logging.handlers
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -118,25 +119,50 @@ def setup_logging(
         log_path = Path(log_dir)
         log_path.mkdir(parents=True, exist_ok=True)
         
-        # 普通文本日志
+        # 普通文本日志 - 按日期轮转
         log_file = log_path / f"{app_name}.log"
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = logging.handlers.TimedRotatingFileHandler(
+            log_file,
+            when='midnight',  # 每天午夜切换
+            interval=1,       # 每天
+            backupCount=30,   # 保留最近30天
+            encoding='utf-8',
+            delay=False
+        )
+        # 自定义文件名格式: server_YYYY-MM-DD.log
+        file_handler.namer = lambda name: str(Path(name).parent / f"{app_name}_{Path(name).suffix[1:]}.log")
         file_handler.setLevel(logging.DEBUG)  # 文件记录更详细
         file_formatter = logging.Formatter(FILE_FORMAT)
         file_handler.setFormatter(file_formatter)
         handlers.append(file_handler)
         
-        # 错误日志（单独文件）
+        # 错误日志（单独文件）- 按日期轮转
         error_file = log_path / f"{app_name}.error.log"
-        error_handler = logging.FileHandler(error_file, encoding='utf-8')
+        error_handler = logging.handlers.TimedRotatingFileHandler(
+            error_file,
+            when='midnight',
+            interval=1,
+            backupCount=30,
+            encoding='utf-8',
+            delay=False
+        )
+        error_handler.namer = lambda name: str(Path(name).parent / f"{app_name}.error_{Path(name).suffix[1:]}.log")
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(file_formatter)
         handlers.append(error_handler)
         
-        # JSON 结构化日志
+        # JSON 结构化日志 - 按日期轮转
         if enable_json:
             json_file = log_path / f"{app_name}.json.log"
-            json_handler = logging.FileHandler(json_file, encoding='utf-8')
+            json_handler = logging.handlers.TimedRotatingFileHandler(
+                json_file,
+                when='midnight',
+                interval=1,
+                backupCount=30,
+                encoding='utf-8',
+                delay=False
+            )
+            json_handler.namer = lambda name: str(Path(name).parent / f"{app_name}.json_{Path(name).suffix[1:]}.log")
             json_handler.setLevel(logging.DEBUG)
             json_formatter = JSONFormatter()
             json_handler.setFormatter(json_formatter)

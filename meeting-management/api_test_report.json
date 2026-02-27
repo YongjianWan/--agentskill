@@ -1,0 +1,51 @@
+{
+  "summary": {
+    "total": 7,
+    "passed": 5,
+    "failed": 1
+  },
+  "details": [
+    {
+      "endpoint": "GET /health",
+      "status": "OK",
+      "status_code": 200,
+      "notes": ""
+    },
+    {
+      "endpoint": "GET /templates",
+      "status": "OK",
+      "status_code": 200,
+      "notes": ""
+    },
+    {
+      "endpoint": "GET /meetings",
+      "status": "OK",
+      "status_code": 200,
+      "notes": ""
+    },
+    {
+      "endpoint": "GET /meetings/M20260227_100914_900002",
+      "status": "FAIL",
+      "status_code": 500,
+      "notes": "Internal Server Error"
+    },
+    {
+      "endpoint": "POST /meetings/{id}/regenerate",
+      "status": "SKIP",
+      "status_code": null,
+      "notes": "No meeting ID or templates available"
+    },
+    {
+      "endpoint": "GET /meetings/M20260227_100914_900002/download",
+      "status": "OK",
+      "status_code": 200,
+      "notes": ""
+    },
+    {
+      "endpoint": "POST /upload/audio",
+      "status": "OK",
+      "status_code": 422,
+      "notes": "Endpoint exists (expects file)"
+    }
+  ]
+}

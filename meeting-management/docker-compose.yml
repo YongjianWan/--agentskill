@@ -1,0 +1,139 @@
+# ============================================
+# Meeting Management API - Docker Compose
+# Python 3.11 + FastAPI + faster-whisper
+# ============================================
+
+version: '3.8'
+
+services:
+  meeting-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: meeting-api:latest
+    container_name: meeting-management-api
+    restart: unless-stopped
+    
+    ports:
+      - "8765:8765"
+    
+    environment:
+      # 基础配置
+      - PORT=8765
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      
+      # 数据库配置（使用容器内路径）
+      - DATABASE_URL=sqlite:///data/meetings.db
+      
+      # 输出目录配置
+      - OUTPUT_DIR=/app/output
+      
+      # 转写配置
+      - WHISPER_MODEL=small
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - WHISPER_LANGUAGE=zh
+      
+      # AI纪要配置
+      - AI_PROVIDER=deepseek
+      - ENABLE_AI_MINUTES=true
+      
+      # 政府场景配置
+      - ENABLE_SIMPLIFIED_CHINESE=true
+    
+    volumes:
+      # Whisper 模型缓存（持久化，避免每次重启都下载）
+      - whisper-cache:/root/.cache/whisper
+      
+      # 会议输出文件（会议录音、纪要文档）
+      - ./output:/app/output
+      
+      # 数据库文件
+      - ./data:/app/data
+      
+      # 日志文件
+      - ./logs:/app/logs
+      
+      # 环境变量配置文件（可选，挂载外部配置文件）
+      # - ./.env:/app/.env:ro
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/api/v1/system/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    
+    # 资源限制（根据实际环境调整）
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+# ============================================
+# GPU 版本（需要 nvidia-docker）
+# ============================================
+# 如需 GPU 支持，取消注释下面的配置：
+#
+#  meeting-api-gpu:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#      target: gpu  # 需要 Dockerfile 中定义 target
+#    image: meeting-api:gpu
+#    container_name: meeting-management-api-gpu
+#    restart: unless-stopped
+#    
+#    ports:
+#      - "8765:8765"
+#    
+#    environment:
+#      - PORT=8765
+#      - LOG_LEVEL=INFO
+#      - HOST=0.0.0.0
+#      - DATABASE_URL=sqlite:///data/meetings.db
+#      - OUTPUT_DIR=/app/output
+#      # GPU 配置
+#      - WHISPER_MODEL=large-v3
+#      - WHISPER_DEVICE=cuda
+#      - WHISPER_COMPUTE_TYPE=float16
+#      - WHISPER_LANGUAGE=zh
+#      - AI_PROVIDER=deepseek
+#      - ENABLE_AI_MINUTES=true
+#      - ENABLE_SIMPLIFIED_CHINESE=true
+#    
+#    volumes:
+#      - whisper-cache:/root/.cache/whisper
+#      - ./output:/app/output
+#      - ./data:/app/data
+#      - ./logs:/app/logs
+#    
+#    # GPU 支持（需要 nvidia-docker2 和 docker-compose 1.28.0+）
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: 1
+#              capabilities: [gpu]
+#    
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8765/api/v1/system/health"]
+#      interval: 30s
+#      timeout: 10s
+#      start_period: 60s
+#      retries: 3
+
+# ============================================
+# 持久化卷
+# ============================================
+volumes:
+  whisper-cache:
+    # Whisper 模型缓存卷
+    # 用于持久化 faster-whisper 模型文件，避免每次启动都重新下载
+    driver: local

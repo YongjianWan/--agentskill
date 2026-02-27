@@ -54,6 +54,9 @@ class MeetingSession:
         self.last_activity = time.time()
         self.is_active = False
         
+        # 纪要模板风格
+        self.minutes_style = "detailed"  # 默认详细版
+        
     def update_activity(self):
         """更新最后活动时间"""
         self.last_activity = time.time()
@@ -341,6 +344,10 @@ class WebSocketManager:
         session = self.sessions.get(session_id)
         if session and session.is_active:
             await session.send_json(data)
+    
+    async def send_json(self, session_id: str, data: dict):
+        """发送 JSON 消息（send_custom_message 的别名）"""
+        await self.send_custom_message(session_id, data)
     
     def get_active_sessions_count(self) -> int:
         """获取活跃会话数"""

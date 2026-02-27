@@ -212,6 +212,30 @@ async def handle_control_message(session_id: str, data: dict):
                 "audio_buffer_size": session.audio_buffer_size
             })
     
+    elif msg_type == "select_minutes_style":
+        # 选择纪要模板风格
+        style = data.get("style", "detailed")
+        from prompts import validate_template, list_templates
+        
+        if validate_template(style):
+            # 保存到会话
+            session = websocket_manager.get_session(session_id)
+            if session:
+                session.minutes_style = style
+                await websocket_manager.send_json(session_id, {
+                    "type": "style_selected",
+                    "style": style,
+                    "message": f"已选择模板: {style}"
+                })
+                logger.info(f"[{session_id}] 纪要模板已选择: {style}")
+        else:
+            await websocket_manager.send_json(session_id, {
+                "type": "error",
+                "code": "INVALID_STYLE",
+                "message": f"无效的模板风格: {style}",
+                "available_styles": [t["id"] for t in list_templates()]
+            })
+    
     else:
         logger.warning(f"[{session_id}] 未知控制消息类型: {msg_type}")
 
@@ -238,6 +262,10 @@ async def websocket_endpoint(
       - {"type": "transcript", "text": "...", "sequence": 1} - 转写结果
       - {"type": "completed", "full_text": "...", "minutes_path": "..."} - 会议完成
       - {"type": "error", "code": "...", "message": "..."} - 错误
+    
+    Phase 4 新增:
+    - 上行: {"type": "select_minutes_style", "style": "detailed"} - 选择纪要模板
+    - 下行: {"type": "style_selected", "style": "..."} - 模板选择确认
     """
     connection_accepted = False
     

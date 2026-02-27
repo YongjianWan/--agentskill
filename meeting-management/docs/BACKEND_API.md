@@ -1,8 +1,10 @@
 # 会议管理后端 API 规范
 
 > **只负责后端！** 前端接口由后端定义，前端按此接入
-> 版本: v1.1
-> 更新: 2026-02-26
+> 版本: v1.2.0
+> 更新: 2026-02-27
+>
+> **Phase 4 更新（2026-02-27）**：多模板支持、繁简转换、公司API框架、Docker部署、健康检查增强
 >
 > **⚠️ 架构变更（2026-02-26）**：已抛弃Handy，浏览器直连后端WebSocket
 >
@@ -71,7 +73,7 @@
 }
 ```
 
-#### GET /meetings/ - 获取会议状态
+#### GET /meetings/{session_id} - 获取会议状态
 
 > **状态：有效**
 
@@ -94,25 +96,54 @@
 
 **Status枚举**: `created` | `recording` | `paused` | `processing` | `completed`
 
-#### POST /meetings//start - 开始录音
+#### POST /meetings/{session_id}/start - 开始录音
 
 > **⚠️ 状态：已弃用（WebSocket内处理）**
 > 新架构下通过 WebSocket `start` 消息处理，此API保留但不再必需。
 
-#### POST /meetings//pause - 暂停录音
+#### POST /meetings/{session_id}/pause - 暂停录音
 
 > **状态：有效（保留功能）**
 
-#### POST /meetings//resume - 恢复录音
+#### POST /meetings/{session_id}/resume - 恢复录音
 
 > **状态：有效（保留功能）**
 
-#### POST /meetings//end - 结束会议
+#### POST /meetings/{session_id}/end - 结束会议
 
-> **⚠️ 状态：已弃用（WebSocket内处理）**
-> 新架构下通过 WebSocket `end` 消息处理，此API保留但不再必需。
+> **状态：有效（v1.2.0 更新）**
 
-#### GET /meetings//result - 获取会议纪要
+结束会议并触发AI纪要生成，支持选择模板风格。
+
+**Query参数**:
+
+- `template_style`: 纪要模板风格（可选，默认`detailed`）
+  - `detailed`: 详细版（默认）
+  - `concise`: 简洁版
+  - `action`: 行动项版
+  - `executive`: 高管摘要版
+
+**Response**:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "session_id": "M20260225_143012_abc123",
+    "status": "processing",
+    "message": "会议处理中，请稍后查询结果",
+    "template_style": "action"
+  }
+}
+```
+
+**说明**:
+
+- 从 recording/paused -> processing -> completed
+- 异步执行：音频转写 -> AI生成 -> 保存结果
+- 通过WebSocket `processing_completed` 通知或轮询查询结果
+
+#### GET /meetings/{session_id}/result - 获取会议纪要
 
 会议结束后查询生成结果。
 
@@ -190,7 +221,7 @@ user_id: "user_001"
 3. AI生成纪要
 4. 通过WebSocket或轮询通知前端完成
 
-#### GET /upload//status - 查询处理状态
+#### GET /upload/{session_id}/status - 查询处理状态
 
 **Response**:
 
@@ -247,7 +278,7 @@ user_id: "user_001"
 }
 ```
 
-#### GET /meetings//transcript - 获取完整转写文本
+#### GET /meetings/{session_id}/transcript - 获取完整转写文本
 
 **Response**:
 
@@ -263,12 +294,165 @@ user_id: "user_001"
         "text": "我们开始开会吧",
         "start_time_ms": 0,
         "end_time_ms": 3000,
-        "speaker_id": null
+        "speaker": "张三"
       }
-    ]
+    ],
+    "language": "zh",
+    "total_segments": 1
   }
 }
 ```
+
+#### PUT /meetings/{session_id}/transcript - 批量更新转写片段
+
+> **状态：已实现 (v1.2.0)**
+
+批量更新转写文本片段，用于人工校对后修正。
+
+**Request**:
+
+```json
+{
+  "segments": [
+    {
+      "id": "seg_001",
+      "text": "修正后的文本",
+      "speaker": "张三"
+    }
+  ]
+}
+```
+
+**Response**:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "updated_count": 1,
+    "message": "更新成功"
+  }
+}
+```
+
+#### PUT /meetings/{session_id}/transcript/{segment_id} - 更新单个转写片段
+
+> **状态：已实现 (v1.2.0)**
+
+更新单个转写片段的内容或发言人。
+
+**Request**:
+
+```json
+{
+  "text": "修正后的文本",
+  "speaker": "张三"
+}
+```
+
+**Response**:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "segment_id": "seg_001",
+    "text": "修正后的文本",
+    "speaker": "张三"
+  }
+}
+```
+
+#### POST /meetings/{session_id}/regenerate - 重新生成纪要
+
+> **状态：已实现 (v1.2.0)**
+
+使用不同模板风格重新生成会议纪要。
+
+**Request**:
+
+```json
+{
+  "template_style": "action"
+}
+```
+
+**Response**:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "session_id": "M20260225_143012_abc123",
+    "template_style": "action",
+    "minutes": {
+      "title": "产品评审会",
+      "topics": [...],
+      "action_items": [...]
+    },
+    "generated_at": "2026-02-26T14:30:00+08:00"
+  }
+}
+```
+
+**说明**:
+
+- 适用于用户对首次生成结果不满意
+- 保留历史版本（可通过多次调用对比）
+- 需要会议已完成且有转写文本
+
+**错误码**:
+- `404`: 会议不存在
+- `400`: 转写文本为空或模板风格无效
+
+---
+
+#### GET /templates - 获取纪要模板列表
+
+> **状态：已实现 (v1.2.0)**
+
+获取所有可用的纪要模板列表。
+
+**Response**:
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "id": "detailed",
+      "name": "详细版",
+      "description": "完整记录讨论过程和决策依据，适合正式会议",
+      "icon": "📋"
+    },
+    {
+      "id": "concise",
+      "name": "简洁版",
+      "description": "高度概括，2分钟快速阅读，适合日常站会",
+      "icon": "⚡"
+    },
+    {
+      "id": "action",
+      "name": "行动项版",
+      "description": "以任务执行为核心，便于跟踪和跟进",
+      "icon": "✅"
+    },
+    {
+      "id": "executive",
+      "name": "高管摘要版",
+      "description": "聚焦决策、资源、风险，一页纸汇报",
+      "icon": "📊"
+    }
+  ]
+}
+```
+
+**说明**:
+
+- 用于前端展示模板选择界面
+- `icon` 字段为 emoji 图标，可直接展示
+
+---
 
 #### GET /meetings/{session_id}/download - 下载会议纪要
 
@@ -302,9 +486,10 @@ curl "http://localhost:8765/api/v1/meetings/M20260226_143012_abc123/download?for
 
 ### 4. 系统接口
 
-#### GET /system/health - 健康检查
+#### GET /health - 健康检查
 
-> **注意**：实际端点为 `/api/v1/system/health`
+> **实际端点**: `/api/v1/health`  
+> **版本**: v1.2.0 - 支持三级状态和多组件健康检测
 
 **Response**:
 
@@ -312,13 +497,63 @@ curl "http://localhost:8765/api/v1/meetings/M20260226_143012_abc123/download?for
 {
   "code": 0,
   "data": {
-    "status": "healthy",
-    "version": "1.0.0",
-    "active_sessions": 3,
-    "whisper_status": "ready"
+    "status": "ok",
+    "version": "1.2.0",
+    "uptime_seconds": 3600,
+    "components": {
+      "api": {
+        "status": "ok"
+      },
+      "database": {
+        "status": "ok"
+      },
+      "model": {
+        "status": "ok",
+        "name": "small",
+        "loaded": true,
+        "device": "cpu",
+        "gpu_available": false
+      },
+      "disk": {
+        "status": "ok",
+        "total_gb": 100,
+        "free_gb": 45,
+        "used_gb": 55,
+        "usage_percent": 55
+      },
+      "websocket": {
+        "active_sessions": 3
+      }
+    }
   }
 }
 ```
+
+**状态说明**:
+
+| 状态 | 含义 | 触发条件 |
+|------|------|----------|
+| `ok` | 健康 | 所有组件正常 |
+| `degraded` | 降级 | 磁盘空间不足(<1GB) 或 模型未加载 |
+| `error` | 故障 | 关键组件不可用 |
+
+**组件字段说明**:
+
+| 组件 | 字段 | 说明 |
+|------|------|------|
+| `model` | `name` | 当前模型名称 (small/medium/large-v3) |
+| | `loaded` | 模型是否已加载到内存 |
+| | `device` | 运行设备 (cpu/cuda) |
+| | `gpu_available` | GPU 是否可用 |
+| `disk` | `total_gb` | 总空间 (GB) |
+| | `free_gb` | 剩余空间 (GB) |
+| | `usage_percent` | 使用率 (%) |
+| `websocket` | `active_sessions` | 当前活跃会议数 |
+
+**降级场景处理**:
+- `disk` 为 `degraded`: 及时清理 output/ 目录，或扩容磁盘
+- `model` 为 `degraded`: 首次启动模型加载中，等待 30-60 秒后重试
+- 生产环境建议设置告警: `status != 'ok'` 时通知运维
 
 ---
 
@@ -438,6 +673,16 @@ ws://{host}:8765/api/v1/ws/meeting/{session_id}?user_id={user_id}
 }
 ```
 
+#### style_selected - 模板选择确认（Phase 4新增）
+
+```json
+{
+  "type": "style_selected",
+  "style": "executive",
+  "message": "已选择模板: executive"
+}
+```
+
 #### error - 错误
 
 ```json
@@ -456,6 +701,7 @@ ws://{host}:8765/api/v1/ws/meeting/{session_id}?user_id={user_id}
 - `CHUNK_ERROR` - 处理音频块失败
 - `END_FAILED` - 结束会议失败
 - `MESSAGE_TOO_LARGE` - 消息过大（>1MB）
+- `INVALID_STYLE` - 无效的模板风格（Phase 4新增）
 
 ---
 
@@ -580,13 +826,54 @@ interface ActionItem {
 - [x] **会议纪要下载接口** (v1.1.1)
 - [x] **REST API 异步 AI 生成** (v1.1.1)
 - [x] **会议列表搜索（日期+关键词）** (v1.1.1)
-- [ ] 性能优化（音频队列/并发）- Phase 4
-- [ ] 通义千问 API 接入 - Phase 4
-- [ ] 多风格纪要模板 - Phase 4
+- [x] **会议纪要模板列表接口** (v1.2.0)
+- [x] **重新生成纪要接口（支持多模板）** (v1.2.0)
+- [x] **繁简转换支持** (v1.2.0)
+- [x] **公司API接入框架** (v1.2.0)
+- [ ] 性能优化（音频队列/并发）- 未来
+- [ ] 流式生成预览 - 暂缓（10秒等得起）
+
+---
+
+## 配置说明
+
+### 环境变量
+
+```bash
+# === 基础配置 ===
+PORT=8765
+LOG_LEVEL=INFO
+
+# === 转写配置 ===
+WHISPER_MODEL=small              # tiny/base/small/medium/large-v3
+WHISPER_DEVICE=cpu               # cpu/cuda/auto
+WHISPER_COMPUTE_TYPE=int8        # int8/float16/float32
+WHISPER_LANGUAGE=zh              # zh/en/auto
+
+# === AI纪要配置 ===
+AI_PROVIDER=deepseek             # deepseek / company
+DEEPSEEK_API_KEY=xxx
+ENABLE_AI_MINUTES=true
+
+# === 政府场景配置（Phase 4）===
+ENABLE_SIMPLIFIED_CHINESE=true   # 繁简转换开关
+
+# === 公司自研API（预留）===
+# COMPANY_API_KEY=xxx
+# COMPANY_BASE_URL=https://api.your-company.com/v1
+```
 
 ---
 
 ## 架构演进记录
+
+### v1.1 → v1.2（2026-02-26）
+
+**Phase 4 更新**：
+- 多风格纪要模板（4种风格）
+- 繁简转换支持（政府场景）
+- 公司API接入框架（预留切换能力）
+- 不接入通义千问（用户明确）
 
 ### v1.0 → v1.1（2026-02-26）
 

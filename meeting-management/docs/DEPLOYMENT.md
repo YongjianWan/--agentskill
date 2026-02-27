@@ -1,8 +1,8 @@
 # 会议管理系统 - 服务器部署文档
 
 > 灵犀第二大脑 - "帮我听" 声音模块
-> 版本: v1.1-beta
-> 更新日期: 2026-02-26
+> 版本: v1.2.0
+> 更新日期: 2026-02-27
 >
 > **架构变更**: 已抛弃 Handy，浏览器直连后端 WebSocket
 
@@ -160,7 +160,156 @@ sudo dnf install -y python3 python3-pip ffmpeg git
 
 ---
 
-## 四、部署步骤
+## 四、部署方式
+
+### 方式一：Docker 部署（推荐）
+
+Docker 部署是最简单、最可复现的部署方式，适合生产环境。
+
+#### 4.1.1 环境要求
+
+| 软件           | 版本   | 说明                   |
+| -------------- | ------ | ---------------------- |
+| Docker         | 20.10+ | 容器引擎               |
+| Docker Compose | 1.29+  | 编排工具（可选但推荐） |
+
+#### 4.1.2 快速启动
+
+```bash
+# 1. 进入项目目录
+cd meeting-management
+
+# 2. 复制环境变量配置
+cp .env.example .env
+# 编辑 .env，填写必要的配置（如 DEEPSEEK_API_KEY）
+
+# 3. 使用 Docker Compose 启动
+docker-compose up -d
+
+# 4. 查看日志
+docker-compose logs -f
+
+# 5. 验证服务
+curl http://localhost:8765/api/v1/health
+```
+
+#### 4.1.3 持久化数据
+
+Docker 部署使用三个 Volume 持久化数据：
+
+| Volume        | 挂载点                   | 用途                       |
+| ------------- | ------------------------ | -------------------------- |
+| whisper-cache | `/root/.cache/whisper` | Whisper 模型缓存           |
+| ./output      | `/app/output`          | 会议输出文件（录音、纪要） |
+| ./data        | `/app/data`            | 数据库文件                 |
+| ./logs        | `/app/logs`            | 应用日志                   |
+
+**数据备份：**
+
+```bash
+# 备份会议数据
+tar -czf meeting-backup-$(date +%Y%m%d).tar.gz output/ data/ logs/
+
+# 恢复数据
+tar -xzf meeting-backup-20260225.tar.gz
+```
+
+#### 4.1.4 常用命令
+
+```bash
+# 查看服务状态
+docker-compose ps
+
+# 停止服务
+docker-compose down
+
+# 重启服务
+docker-compose restart
+
+# 更新镜像后重新构建
+docker-compose build --no-cache
+docker-compose up -d
+
+# 进入容器调试
+docker exec -it meeting-management-api /bin/bash
+
+# 查看健康检查状态
+docker inspect --format='{{.State.Health.Status}}' meeting-management-api
+```
+
+#### 4.1.5 GPU 支持（可选）
+
+如需 GPU 加速转写：
+
+```yaml
+# docker-compose.yml 中取消注释 GPU 配置
+services:
+  meeting-api:
+    # ... 其他配置 ...
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+**要求：**
+
+- 安装 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+- 修改环境变量：`WHISPER_DEVICE=cuda`, `WHISPER_MODEL=large-v3`
+
+#### 4.1.6 健康检查
+
+容器内置健康检查，每 30 秒检测一次：
+
+```bash
+# 查看健康状态
+curl http://localhost:8765/api/v1/health
+
+# 预期返回
+{
+  "code": 0,
+  "data": {
+    "status": "ok",
+    "version": "1.2.0",
+    "uptime_seconds": 3600,
+    "components": {
+      "api": {"status": "ok"},
+      "database": {"status": "ok"},
+      "model": {
+        "status": "ok",
+        "name": "small",
+        "loaded": true,
+        "device": "cpu",
+        "gpu_available": false
+      },
+      "disk": {
+        "status": "ok",
+        "total_gb": 100,
+        "free_gb": 45,
+        "usage_percent": 55
+      },
+      "websocket": {
+        "active_sessions": 0
+      }
+    }
+  }
+}
+```
+
+**状态说明：**
+
+- `ok`: 一切正常
+- `degraded`: 服务可用但有问题（磁盘空间不足、模型未加载）
+- `error`: 服务不可用
+
+---
+
+### 方式二：本地部署
+
+如需自定义 Python 环境或使用现有服务器，可选择本地部署。
 
 ### 4.1 下载代码
 
@@ -199,33 +348,63 @@ python -c "import websockets, docx, requests; print('✓ 依赖安装成功')"
 
 ### 4.4 配置环境变量
 
-创建 `.env` 文件（在项目根目录）：
+创建 `.env` 文件（在项目根目录），参考 `.env.example`：
 
 ```bash
-# AI 服务配置 (DeepSeek)
-DEEPSEEK_API_KEY=your-api-key-here
+# ========== 数据库配置 ==========
+DB_TYPE=sqlite
+# HIGHGO_HOST=localhost
+# HIGHGO_PORT=5866
+# HIGHGO_USER=highgo
+# HIGHGO_PASSWORD=your_password
+# HIGHGO_DATABASE=meetings
+
+# ========== 服务配置 ==========
+PORT=8765
+HOST=0.0.0.0
+LOG_LEVEL=INFO
+
+# ========== 转写配置 ==========
+WHISPER_MODEL=small
+WHISPER_DEVICE=cpu
+WHISPER_COMPUTE_TYPE=int8
+WHISPER_LANGUAGE=zh
+
+# ========== AI纪要配置 ==========
+ENABLE_AI_MINUTES=true
+DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 
-# 服务器配置
-MEETING_HOST=0.0.0.0
-MEETING_PORT=8765
-MEETING_OUTPUT_DIR=./output
+# AI请求配置
+AI_REQUEST_TIMEOUT=120
+AI_MAX_RETRIES=3
+AI_RETRY_DELAY=1.0
+AI_MAX_TEXT_LENGTH=15000
 
-# 日志级别 (DEBUG/INFO/WARNING/ERROR)
-LOG_LEVEL=INFO
+# 噪声词过滤
+AI_NOISE_WORDS=字幕by索兰娅,字幕,索兰娅,suolan,字幕制作,subtitle
 ```
 
 **环境变量说明：**
 
-| 变量名                 | 必需 | 默认值                   | 说明              |
-| ---------------------- | ---- | ------------------------ | ----------------- |
-| `DEEPSEEK_API_KEY`   | ✅   | -                        | DeepSeek API 密钥 |
-| `DEEPSEEK_BASE_URL`  | ❌   | https://api.deepseek.com | API 基础地址      |
-| `DEEPSEEK_MODEL`     | ❌   | deepseek-chat            | 模型名称          |
-| `MEETING_HOST`       | ❌   | 0.0.0.0                  | 服务器监听地址    |
-| `MEETING_PORT`       | ❌   | 8765                     | WebSocket 端口    |
-| `MEETING_OUTPUT_DIR` | ❌   | ./output                 | 输出目录          |
+| 变量名                   | 必需 | 默认值                   | 说明                                  |
+| ------------------------ | ---- | ------------------------ | ------------------------------------- |
+| `DB_TYPE`              | ❌   | sqlite                   | 数据库类型: sqlite/highgo             |
+| `PORT`                 | ❌   | 8765                     | 服务端口                              |
+| `HOST`                 | ❌   | 0.0.0.0                  | 监听地址                              |
+| **转写配置**       |      |                          |                                       |
+| `WHISPER_MODEL`        | ❌   | small                    | 模型: tiny/base/small/medium/large-v3 |
+| `WHISPER_DEVICE`       | ❌   | cpu                      | 计算设备: cpu/cuda/auto               |
+| `WHISPER_COMPUTE_TYPE` | ❌   | int8                     | 精度: int8/float16/float32            |
+| **AI纪要**         |      |                          |                                       |
+| `ENABLE_AI_MINUTES`    | ❌   | true                     | 是否启用AI纪要                        |
+| `DEEPSEEK_API_KEY`     | ✅   | -                        | DeepSeek API密钥                      |
+| `DEEPSEEK_BASE_URL`    | ❌   | https://api.deepseek.com | API地址                               |
+| `DEEPSEEK_MODEL`       | ❌   | deepseek-chat            | 模型名称                              |
+| `AI_REQUEST_TIMEOUT`   | ❌   | 120                      | 请求超时(秒)                          |
+| `AI_MAX_RETRIES`       | ❌   | 3                        | 最大重试次数                          |
+| `AI_NOISE_WORDS`       | ❌   | -                        | 噪声词过滤(逗号分隔)                  |
 
 ### 4.5 创建输出目录
 
@@ -348,12 +527,12 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8765
 
 假设本机 IP 为 `192.168.1.100`：
 
-| 用途 | 地址 |
-|------|------|
-| **本机访问** | `http://localhost:8765` |
-| **局域网访问** | `http://192.168.1.100:8765` |
-| **API 文档** | `http://192.168.1.100:8765/docs` |
-| **WebSocket** | `ws://192.168.1.100:8765/api/v1/ws/meeting/{id}?user_id=xxx` |
+| 用途                 | 地址                                                           |
+| -------------------- | -------------------------------------------------------------- |
+| **本机访问**   | `http://localhost:8765`                                      |
+| **局域网访问** | `http://192.168.1.100:8765`                                  |
+| **API 文档**   | `http://192.168.1.100:8765/docs`                             |
+| **WebSocket**  | `ws://192.168.1.100:8765/api/v1/ws/meeting/{id}?user_id=xxx` |
 
 ### 6.4 验证局域网访问
 
@@ -367,6 +546,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8765
 ## 七、自动启动配置（Windows）
 
 ### 7.1 手动启动（开发调试）
+
 ```batch
 cd src
 python -m uvicorn main:app --host 0.0.0.0 --port 8765
@@ -377,30 +557,31 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8765
 #### 方式一：任务计划程序（推荐）
 
 1. **安装自动启动任务**:
+
    ```batch
    scripts\install_auto_start.bat
    ```
-
 2. **验证任务已创建**:
+
    - 打开"任务计划程序"（taskschd.msc）
    - 查看任务库中的 `MeetingManagementServer`
-
 3. **立即启动服务测试**:
+
    ```batch
    scripts\start_server.bat
    ```
-
 4. **停止服务**:
+
    ```batch
    scripts\stop_server.bat
    ```
-
 5. **检查服务状态**:
+
    ```batch
    scripts\check_server.bat
    ```
-
 6. **卸载自动启动**:
+
    ```batch
    scripts\uninstall_auto_start.bat
    ```
@@ -434,10 +615,24 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8765
 
 ```bash
 # HTTP 健康检查
-curl http://localhost:8765/api/v1/system/health
+curl http://localhost:8765/api/v1/health
 
-# 预期返回:
-{"code": 0, "data": {"status": "healthy", "version": "1.1-beta"}}
+# 预期返回 (v1.2.0+):
+# {
+#   "code": 0,
+#   "data": {
+#     "status": "ok",
+#     "version": "1.2.0",
+#     "uptime_seconds": 3600,
+#     "components": {
+#       "api": {"status": "ok"},
+#       "database": {"status": "ok"},
+#       "model": {"status": "ok", "name": "small", "device": "cpu"},
+#       "disk": {"status": "ok", "free_gb": 45, "usage_percent": 55},
+#       "websocket": {"active_sessions": 0}
+#     }
+#   }
+# }
 ```
 
 ### 8.2 WebSocket 连接测试
@@ -453,7 +648,6 @@ wscat -c "ws://localhost:8765/api/v1/ws/meeting/test-session?user_id=test"
 ### 8.3 浏览器测试
 
 打开 `test/real/index.html`，按页面指引测试完整流程。
-
 
 ---
 
@@ -507,8 +701,8 @@ meeting-management/
 
 ### 10.1 WebSocket 接口 (v1.1)
 
-| 端点 | 描述 |
-|------|------|
+| 端点                                                          | 描述           |
+| ------------------------------------------------------------- | -------------- |
 | `ws://host:port/api/v1/ws/meeting/{session_id}?user_id=xxx` | 会议实时转写流 |
 
 **消息协议：**
@@ -528,16 +722,16 @@ meeting-management/
 
 ### 10.2 REST API
 
-| 方法 | 端点 | 描述 |
-|------|------|------|
-| GET | `/api/v1/system/health` | 健康检查 |
-| GET | `/api/v1/meetings` | 会议列表 |
-| POST | `/api/v1/meetings` | 创建会议 |
-| GET | `/api/v1/meetings/{id}` | 会议详情 |
-| GET | `/api/v1/meetings/{id}/result` | 获取纪要 |
-| GET | `/api/v1/meetings/{id}/download` | 下载文件 |
-| POST | `/api/v1/upload/audio` | 上传音频 |
-| GET | `/api/v1/upload/{id}/status` | 查询状态 |
+| 方法 | 端点                               | 描述     |
+| ---- | ---------------------------------- | -------- |
+| GET  | `/api/v1/system/health`          | 健康检查 |
+| GET  | `/api/v1/meetings`               | 会议列表 |
+| POST | `/api/v1/meetings`               | 创建会议 |
+| GET  | `/api/v1/meetings/{id}`          | 会议详情 |
+| GET  | `/api/v1/meetings/{id}/result`   | 获取纪要 |
+| GET  | `/api/v1/meetings/{id}/download` | 下载文件 |
+| POST | `/api/v1/upload/audio`           | 上传音频 |
+| GET  | `/api/v1/upload/{id}/status`     | 查询状态 |
 
 完整 API 文档见: `http://localhost:8765/docs`
 
@@ -560,7 +754,7 @@ sudo journalctl -u meeting-server -f
 
 | 指标     | 检查命令                              |
 | -------- | ------------------------------------- |
-| 服务状态 | `curl http://localhost:8765/health` |
+| 服务状态 | `curl http://localhost:8765/api/v1/health` |
 | 进程运行 | `ps aux                               |
 | 端口监听 | `netstat -tlnp                        |
 | 磁盘空间 | `df -h output/`                     |
@@ -665,27 +859,28 @@ cp .env.backup .env
 | ---------- | ------ | ------------------ |
 | 技术负责人 | -      | 架构决策、紧急问题 |
 | 运维人员   | -      | 日常维护、监控     |
-| 产品经理   | -      | 业务需求、优先级   |
+| 产品经理   |        | 业务需求、优先级   |
 
 ---
 
 ## 附录：Handy 客户端编译（可选）
 
-> 当前阶段：Handy 编译**非必需**，服务器可使用 Mock 客户端测试  
+> 当前阶段：Handy 编译**非必需**，服务器可使用 Mock 客户端测试
 > 建议在 **V1.5 实时增强阶段** 再进行 Handy 编译
 
 ### 环境要求
 
-| 组件 | 版本 | 用途 |
-|------|------|------|
-| Rust | 1.70+ | Handy 后端编译 |
-| Bun | 1.0+ | 前端构建 |
-| CMake | 3.20+ | whisper.cpp 构建 |
-| Vulkan SDK | 最新 | GPU 加速转写 |
+| 组件       | 版本  | 用途             |
+| ---------- | ----- | ---------------- |
+| Rust       | 1.70+ | Handy 后端编译   |
+| Bun        | 1.0+  | 前端构建         |
+| CMake      | 3.20+ | whisper.cpp 构建 |
+| Vulkan SDK | 最新  | GPU 加速转写     |
 
 ### Windows 安装步骤
 
 **1. 安装 Rust**
+
 ```powershell
 # https://rustup.rs/
 Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
@@ -693,16 +888,19 @@ Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 ```
 
 **2. 安装 Bun**
+
 ```powershell
 # https://bun.sh/
 powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 
 **3. 安装 Visual Studio Build Tools**
+
 - 下载：https://visualstudio.microsoft.com/downloads/
 - 安装 "使用 C++ 的桌面开发" 工作负载
 
 **4. 安装 Vulkan SDK**
+
 ```powershell
 # 下载并安装
 Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile "vulkan-sdk.exe"
@@ -714,6 +912,7 @@ vulkaninfo
 ```
 
 **5. 编译 Handy**
+
 ```bash
 cd Handy-source
 bun install
@@ -725,29 +924,32 @@ bun tauri build
 
 ### 已知问题
 
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| whisper-rs-sys 编译失败 | Vulkan SDK 未安装或 VULKAN_SDK 环境变量未设置 | 安装 Vulkan SDK 并重启终端 |
-| 编译内存不足 | whisper.cpp 编译需要大量内存 | 关闭其他程序，或降低并行编译任务数 |
-| 路径过长错误 | Windows 默认路径长度限制 260 字符 | 使用短路径（如 C:\Handy）或启用长路径支持 |
-| 编码错误 C4819 | 源文件包含 Unicode 字符，MSVC 使用 GB2312 | 设置环境变量 `CL=/utf-8` |
-| Handy 源码编译错误 | 依赖版本冲突（tungstenite 版本不匹配） | 需修复 Handy 源码中的依赖版本 |
+| 问题                    | 原因                                          | 解决                                      |
+| ----------------------- | --------------------------------------------- | ----------------------------------------- |
+| whisper-rs-sys 编译失败 | Vulkan SDK 未安装或 VULKAN_SDK 环境变量未设置 | 安装 Vulkan SDK 并重启终端                |
+| 编译内存不足            | whisper.cpp 编译需要大量内存                  | 关闭其他程序，或降低并行编译任务数        |
+| 路径过长错误            | Windows 默认路径长度限制 260 字符             | 使用短路径（如 C:\Handy）或启用长路径支持 |
+| 编码错误 C4819          | 源文件包含 Unicode 字符，MSVC 使用 GB2312     | 设置环境变量 `CL=/utf-8`                |
+| Handy 源码编译错误      | 依赖版本冲突（tungstenite 版本不匹配）        | 需修复 Handy 源码中的依赖版本             |
 
 ### 编译状态（2026-02-25）
 
 ✅ **已完成**：
+
 - Vulkan SDK 安装
 - 短路径设置（C:\Handy）
 - UTF-8 编码设置
 - whisper.cpp 编译成功
 
 🔴 **阻塞**：
+
 - Handy 源码存在编译错误（`MeetingBridge` 未导入、`tungstenite` 版本冲突）
 - 需等待 Handy 官方修复或手动修改源码
 
 ### 配置 Handy 连接服务器
 
 编辑 Handy 配置文件：
+
 ```bash
 # Windows: %APPDATA%\Handy\config.json
 {

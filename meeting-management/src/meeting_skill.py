@@ -35,6 +35,7 @@ import json
 import re
 import warnings
 import hashlib
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
@@ -43,6 +44,73 @@ from dataclasses import dataclass, field
 from ai_minutes_generator import filter_noise_words, NOISE_WORDS
 
 warnings.filterwarnings("ignore")
+
+# ============ 配置读取 ============
+
+# Whisper 模型配置（从环境变量读取，提供默认值）
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")  # tiny/base/small/medium/large-v3
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "auto")  # cpu/cuda/auto
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")  # int8/float16/float32
+WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "zh")  # zh/en/auto
+
+# 繁简转换配置
+ENABLE_SIMPLIFIED_CHINESE = os.getenv("ENABLE_SIMPLIFIED_CHINESE", "true").lower() == "true"
+
+# 繁简转换器（延迟初始化）
+_opencc_converter = None
+
+def _get_opencc_converter():
+    """获取opencc繁简转换器（延迟加载）"""
+    global _opencc_converter
+    if _opencc_converter is None and ENABLE_SIMPLIFIED_CHINESE:
+        try:
+            import opencc
+            _opencc_converter = opencc.OpenCC('t2s')  # 繁体转简体
+            print("[Info] 繁简转换已启用")
+        except ImportError:
+            print("[Warning] opencc-python未安装，繁简转换未启用。安装: pip install opencc-python-reimplemented")
+            return None
+    return _opencc_converter
+
+
+def convert_to_simplified(text: str) -> str:
+    """将繁体中文转换为简体中文"""
+    if not ENABLE_SIMPLIFIED_CHINESE or not text:
+        return text
+    
+    converter = _get_opencc_converter()
+    if converter is None:
+        return text
+    
+    try:
+        return converter.convert(text)
+    except Exception as e:
+        print(f"[Warning] 繁简转换失败: {e}")
+        return text
+
+
+def _detect_device() -> str:
+    """检测计算设备"""
+    if WHISPER_DEVICE != "auto":
+        return WHISPER_DEVICE
+    
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+    except ImportError:
+        pass
+    return "cpu"
+
+
+def _get_compute_type(device: str) -> str:
+    """获取计算精度"""
+    if WHISPER_COMPUTE_TYPE != "int8":
+        return WHISPER_COMPUTE_TYPE
+    
+    if device == "cuda":
+        return "float16"
+    return "int8"
 
 
 # ============ 数据模型 ============
@@ -221,17 +289,21 @@ def transcribe(audio_path: str, model: str = "auto", language: str = "zh") -> Di
     """
     from faster_whisper import WhisperModel
     
-    # 自动选择模型：会议场景默认用 small（效果更好）
+    # 自动选择模型：优先使用环境变量配置
     if model == "auto":
-        # 会议场景推荐 small（244MB，中文识别效果更好）
-        model = "small"
-        print(f"[Info] 会议音频自动使用 small 模型（识别效果更好）")
+        model = WHISPER_MODEL  # 使用环境变量配置
+        print(f"[Info] 使用Whisper模型: {model} (设备: {_detect_device()})")
     
     if not Path(audio_path).exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
     
-    model_obj = WhisperModel(model, device="cpu", compute_type="int8")
-    segments, info = model_obj.transcribe(audio_path, beam_size=5, language=language)
+    # 使用环境变量配置的设备
+    device = _detect_device()
+    compute_type = _get_compute_type(device)
+    model_obj = WhisperModel(model, device=device, compute_type=compute_type)
+    # 语言设置优先使用环境变量
+    effective_language = WHISPER_LANGUAGE if WHISPER_LANGUAGE != "auto" else language
+    segments, info = model_obj.transcribe(audio_path, beam_size=5, language=effective_language)
     
     result_segments = []
     speakers = set()
@@ -928,7 +1000,13 @@ def _get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
         from faster_whisper import WhisperModel
-        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+        
+        device = _detect_device()
+        compute_type = _get_compute_type(device)
+        model = WHISPER_MODEL
+        
+        print(f"[Info] 加载Whisper模型: {model}, 设备: {device}, 精度: {compute_type}")
+        _whisper_model = WhisperModel(model, device=device, compute_type=compute_type)
     return _whisper_model
 
 
@@ -1047,6 +1125,10 @@ def transcribe_bytes(audio_bytes: bytes, mime_type: str = "audio/webm") -> Dict[
         full_text = " ".join(full_text_parts)
         # 过滤噪声词
         full_text = filter_noise_words(full_text)
+        # 繁简转换
+        full_text = convert_to_simplified(full_text)
+        for r in results:
+            r["text"] = convert_to_simplified(r["text"])
         
         return {
             "segments": results,

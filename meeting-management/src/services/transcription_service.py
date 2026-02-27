@@ -2,6 +2,9 @@
 """
 音频转写服务
 支持 Mock 转写（开发测试）和 Whisper 转写（生产）
+
+更新记录:
+- 2026-02-26: 添加环境变量配置支持（模型/设备/精度）
 """
 
 import os
@@ -16,6 +19,69 @@ from logger_config import get_logger
 from models.meeting import TranscriptSegment
 
 logger = get_logger(__name__)
+
+
+# ========== 配置读取 ==========
+
+# Whisper 模型配置
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")  # tiny/base/small/medium/large-v3
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "auto")  # cpu/cuda/auto
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")  # int8/float16/float32
+WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "zh")  # zh/en/auto
+
+# 功能开关
+USE_WHISPER = os.getenv("USE_WHISPER", "true").lower() == "true"
+MOCK_TRANSCRIPTION = os.getenv("MOCK_TRANSCRIPTION", "false").lower() == "true"
+
+
+def _detect_device() -> str:
+    """自动检测计算设备"""
+    if WHISPER_DEVICE != "auto":
+        return WHISPER_DEVICE
+    
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            logger.info(f"检测到GPU: {gpu_name}")
+            return "cuda"
+    except ImportError:
+        pass
+    
+    logger.info("未检测到GPU，使用CPU")
+    return "cpu"
+
+
+def _get_compute_type(device: str) -> str:
+    """根据设备获取推荐的计算精度"""
+    if WHISPER_COMPUTE_TYPE != "int8":
+        return WHISPER_COMPUTE_TYPE
+    
+    if device == "cuda":
+        return "float16"  # GPU使用float16
+    return "int8"  # CPU使用int8
+
+
+def log_config():
+    """打印转写配置"""
+    device = _detect_device()
+    compute_type = _get_compute_type(device)
+    
+    logger.info("=" * 50)
+    logger.info("转写服务配置:")
+    logger.info(f"  模型: {WHISPER_MODEL}")
+    logger.info(f"  设备: {device}")
+    logger.info(f"  精度: {compute_type}")
+    logger.info(f"  语言: {WHISPER_LANGUAGE}")
+    logger.info(f"  使用Whisper: {USE_WHISPER}")
+    logger.info(f"  Mock模式: {MOCK_TRANSCRIPTION}")
+    logger.info("=" * 50)
+    
+    # 给出建议
+    if device == "cpu" and WHISPER_MODEL in ["medium", "large-v1", "large-v2", "large-v3"]:
+        logger.warning("⚠️ 当前使用CPU运行大模型，转写速度会很慢，建议:")
+        logger.warning("   1. 切换到small模型（WHISPER_MODEL=small）")
+        logger.warning("   2. 或使用支持CUDA的GPU环境")
 
 
 @dataclass
@@ -55,7 +121,7 @@ class MockTranscriptionService:
     ]
     
     def __init__(self):
-        self.enabled = os.getenv("MOCK_TRANSCRIPTION", "true").lower() == "true"
+        self.enabled = MOCK_TRANSCRIPTION
         self.latency_ms = int(os.getenv("MOCK_LATENCY_MS", "500"))  # 模拟转写延迟
         self.sentence_index = 0
         logger.info(f"Mock 转写服务已初始化 (enabled={self.enabled})")
@@ -135,24 +201,19 @@ class WhisperTranscriptionService:
     Whisper 转写服务（生产环境）
     
     使用 faster-whisper 进行本地转写
+    支持通过环境变量配置模型、设备、精度
     """
     
-    def __init__(self, model_size: str = "small"):
-        self.model_size = model_size
-        self.model = None
-        self.device = "cuda" if self._check_cuda() else "cpu"
+    def __init__(self):
+        self.model_size = WHISPER_MODEL
+        self.device = _detect_device()
+        self.compute_type = _get_compute_type(self.device)
+        self.language = WHISPER_LANGUAGE
         
-        # 延迟加载模型（避免启动时长时间阻塞）
+        self.model = None
         self._model_loaded = False
-        logger.info(f"Whisper 转写服务已初始化 (model={model_size}, device={self.device})")
-    
-    def _check_cuda(self) -> bool:
-        """检查是否可用 CUDA"""
-        try:
-            import torch
-            return torch.cuda.is_available()
-        except ImportError:
-            return False
+        
+        logger.info(f"Whisper 转写服务已初始化 (model={self.model_size}, device={self.device}, compute_type={self.compute_type})")
     
     async def _load_model(self):
         """异步加载模型"""
@@ -162,14 +223,24 @@ class WhisperTranscriptionService:
         try:
             from faster_whisper import WhisperModel
             
+            logger.info(f"正在加载 Whisper 模型: {self.model_size} ...")
+            start_time = time.time()
+            
             # 在线程池中加载模型避免阻塞事件循环
             loop = asyncio.get_event_loop()
             self.model = await loop.run_in_executor(
                 None,
-                lambda: WhisperModel(self.model_size, device=self.device, compute_type="int8")
+                lambda: WhisperModel(
+                    self.model_size, 
+                    device=self.device, 
+                    compute_type=self.compute_type
+                )
             )
+            
             self._model_loaded = True
-            logger.info(f"Whisper 模型加载完成: {self.model_size}")
+            load_time = time.time() - start_time
+            logger.info(f"Whisper 模型加载完成: {self.model_size} ({load_time:.2f}s)")
+            
         except Exception as e:
             logger.error(f"Whisper 模型加载失败: {e}")
             raise
@@ -207,7 +278,11 @@ class WhisperTranscriptionService:
             loop = asyncio.get_event_loop()
             segments, info = await loop.run_in_executor(
                 None,
-                lambda: self.model.transcribe(str(temp_file), beam_size=5, language="zh")
+                lambda: self.model.transcribe(
+                    str(temp_file), 
+                    beam_size=5, 
+                    language=self.language if self.language != "auto" else None
+                )
             )
             
             logger.info(f"Whisper 转写完成: 语言={info.language}, 概率={info.language_probability:.2f}")
@@ -255,9 +330,11 @@ class TranscriptionService:
     """
     
     def __init__(self):
+        log_config()  # 打印配置
+        
         self.mock_service = MockTranscriptionService()
         self.whisper_service: Optional[WhisperTranscriptionService] = None
-        self.use_whisper = os.getenv("USE_WHISPER", "false").lower() == "true"
+        self.use_whisper = USE_WHISPER and not MOCK_TRANSCRIPTION
         
         if self.use_whisper:
             try:
@@ -295,7 +372,13 @@ class TranscriptionService:
             "mode": "whisper" if self.use_whisper else "mock",
             "mock_enabled": self.mock_service.enabled,
             "whisper_loaded": self.whisper_service._model_loaded if self.whisper_service else False,
-            "active_tasks": len(self._active_tasks)
+            "active_tasks": len(self._active_tasks),
+            "config": {
+                "model": WHISPER_MODEL,
+                "device": _detect_device(),
+                "compute_type": _get_compute_type(_detect_device()),
+                "language": WHISPER_LANGUAGE
+            }
         }
 
 

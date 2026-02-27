@@ -1,0 +1,75 @@
+{
+  "summary": {
+    "total": 7,
+    "passed": 5,
+    "failed": 1,
+    "skipped": 1
+  },
+  "details": [
+    {
+      "endpoint": "GET /health",
+      "status": "OK",
+      "status_code": 200,
+      "notes": "服务健康检查通过"
+    },
+    {
+      "endpoint": "GET /templates",
+      "status": "OK",
+      "status_code": 200,
+      "notes": "接口返回成功，但模板列表为空（返回数据结构为 {code, data} 嵌套格式）"
+    },
+ {
+      "endpoint": "GET /meetings",
+      "status": "OK",
+      "status_code": 200,
+      "notes": "成功获取 7 个会议，使用会议ID: M20260227_100914_900002 进行后续测试"
+    },
+    {
+      "endpoint": "GET /meetings/{id}",
+      "status": "FAIL",
+      "status_code": 500,
+      "notes": "后端 Bug: Pydantic 验证错误。MeetingResponse 模型期望扁平结构，但 API 返回 {code, data} 嵌套格式，导致字段缺失验证失败"
+    },
+    {
+      "endpoint": "POST /meetings/{id}/regenerate",
+      "status": "SKIP",
+      "status_code": null,
+      "notes": "由于 GET /meetings/{id} 返回 500，无法获取会议详情进行重新生成测试"
+    },
+    {
+      "endpoint": "GET /meetings/{id}/download",
+      "status": "OK",
+      "status_code": 200,
+      "notes": "下载接口工作正常（返回 JSON 格式数据）"
+    },
+    {
+      "endpoint": "POST /upload/audio",
+      "status": "OK",
+      "status_code": 422,
+      "notes": "端点存在，返回 422 表示需要上传文件（符合预期）"
+    }
+  ],
+  "issues_found": [
+    {
+      "severity": "high",
+      "endpoint": "GET /meetings/{id}",
+      "description": "Pydantic 模型验证失败",
+      "root_cause": "MeetingResponse 模型定义与 API 实际返回格式不匹配。模型期望扁平字段（session_id, user_id, title等），但 API 返回嵌套格式 {code: 0, data: {...}}",
+      "suggestion": "修复方案二选一：1) 修改 MeetingResponse 模型支持嵌套格式；2) 修改 get_meeting 函数返回扁平结构"
+    },
+    {
+      "severity": "low",
+      "endpoint": "GET /templates",
+      "description": "模板列表为空",
+      "root_cause": "list_templates() 函数返回 4 个模板，但 API 返回数据结构可能导致前端解析问题",
+      "suggestion": "确认前端是否能正确解析 {code, data: [...]} 格式的响应"
+    }
+  ],
+  "test_environment": {
+    "base_url": "http://localhost:8765",
+    "api_version": "/api/v1",
+    "test_time": "2026-02-27T09:53:00+08:00",
+    "existing_meetings": 7,
+    "test_meeting_id": "M20260227_100914_900002"
+  }
+}

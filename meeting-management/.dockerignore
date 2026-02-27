@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test/
+
+# Documentation (keep docs/ for templates if needed)
+docs/*.md
+docs/*.png
+
+# Output data (will be mounted as volume)
+output/
+logs/
+
+# Local database (will be mounted as volume)
+data/*.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archive
+archive/
+
+# Session state (development only)
+SESSION_STATE.yaml
