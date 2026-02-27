@@ -361,7 +361,13 @@ DB_TYPE=sqlite
 # HIGHGO_PORT=9310
 # HIGHGO_USER=ai_gwy
 # HIGHGO_PASSWORD=your_password
+
+# 方式1: 使用独立数据库（推荐）
 # HIGHGO_DATABASE=meetings
+
+# 方式2: 使用现有数据库+新模式（归纳到现有体系）
+# HIGHGO_DATABASE=ai_civil_servant
+# HIGHGO_SCHEMA=meeting_mgmt    # 表将创建在此schema下，与现有数据隔离
 
 # ========== 服务配置 ==========
 PORT=8765
@@ -401,6 +407,7 @@ AI_NOISE_WORDS=字幕by索兰娅,字幕,索兰娅,suolan,字幕制作,subtitle
 | `HIGHGO_USER`          | ❌   | highgo                   | 瀚高数据库用户名                       |
 | `HIGHGO_PASSWORD`      | ❌   | -                        | 瀚高数据库密码                         |
 | `HIGHGO_DATABASE`      | ❌   | meetings                 | 瀚高数据库名                           |
+| `HIGHGO_SCHEMA`        | ❌   | -                        | 数据库模式(Schema)，用于在现有库中隔离数据 |
 | `PORT`                 | ❌   | 8765                     | 服务端口                              |
 | `HOST`                 | ❌   | 0.0.0.0                  | 监听地址                              |
 | **转写配置**       |      |                          |                                       |
@@ -416,7 +423,35 @@ AI_NOISE_WORDS=字幕by索兰娅,字幕,索兰娅,suolan,字幕制作,subtitle
 | `AI_MAX_RETRIES`       | ❌   | 3                        | 最大重试次数                          |
 | `AI_NOISE_WORDS`       | ❌   | -                        | 噪声词过滤(逗号分隔)                  |
 
-### 4.5 创建输出目录
+### 4.5 数据库部署方式选择
+
+#### 方式一：独立数据库（推荐）
+
+适用于会议管理作为独立系统部署。
+
+```bash
+HIGHGO_DATABASE=meetings
+```
+
+- 数据完全隔离
+- 便于备份和迁移
+- 需要创建独立数据库
+
+#### 方式二：现有数据库 + Schema（归纳到现有体系）
+
+适用于将会议管理集成到现有系统中，与现有数据共存。
+
+```bash
+HIGHGO_DATABASE=ai_civil_servant
+HIGHGO_SCHEMA=meeting_mgmt
+```
+
+- 利用现有数据库资源
+- 通过 Schema 隔离数据（表前缀机制）
+- 适合已有数据库体系的环境
+- **注意**: 需要确保数据库用户有创建 Schema 的权限
+
+### 4.6 创建输出目录
 
 ```bash
 mkdir -p output/meetings
