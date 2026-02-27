@@ -11,44 +11,35 @@ meta:
   
 # === 本轮更新 ===
 current_session:
-  focus: "文档膨胀处理完成 + Swagger安全开关"
+  focus: "文档体系精简完成"
   changes:
-    - "归档过期文档: SESSION_HANDOFF.md, FRONTEND_MINIMAL.md等"
-    - "重命名中文文件: 测试清单.md -> TEST_CHECKLIST.md"
-    - "精简docs目录至9个核心文档"
-    - "文档路由精简: 只保留/api和/contract"
-    - "添加DISABLE_SWAGGER环境变量，生产环境可关闭自动API文档"
-    - "更新.env.example添加安全配置说明"
+    - "SKILL.md 归档（内容过时，定位已不适用）"
+    - "PROJECT_CONTEXT.md 合并到 README.md 后删除"
+    - "根目录精简至3个核心文档（CHANGELOG.md, README.md, SESSION_STATE.yaml）"
+    - "文档膨胀处理会话结束"
   model_roadmap:
     current: "faster-whisper small (CPU)"
     temp_deployment: "保持small模型（虚拟机无GPU）"
     customer_deployment: "可切换medium/large-v3（客户有GPU）"
     future: "接入公司自研API（通过AI_PROVIDER=company）"
-  session_count: 20
+  session_count: 21
   last_session_summary: |
-    本轮完成（第22轮 - 文档膨胀处理）：
-    1. 文档归档：
-       - 归档 SESSION_HANDOFF.md（内容已同步到SESSION_STATE.yaml）
-       - 归档 FRONTEND_MINIMAL.md, UPDATE_SUMMARY_20260227.md, 未来方向.md
-       - 归档 BOUNDARY_FIXES.md, DEPLOYMENT.md等历史文档
-    2. 文档重命名：
-       - 测试清单.md -> TEST_CHECKLIST.md
-       - 所有中文文件已处理完毕
-    3. 文档路由精简：
-       - 线上只保留 /docs/api 和 /docs/contract
-       - 其他文档通过仓库查看
-    4. Swagger安全开关：
-       - 添加 DISABLE_SWAGGER 环境变量
-       - 生产环境可关闭自动生成的API文档，防止暴露接口结构
-       - 手写文档中心不受影响
-    5. 文档结构现状：
-       - docs/ 目录：9个核心文档
+    本轮完成（第23轮 - 文档体系收尾）：
+    1. SKILL.md 归档：
+       - 内容过时（AI Skill定位已不适用当前后端服务架构）
+       - 归档至 archive/docs/2026-02-28/
+    2. PROJECT_CONTEXT.md 合并：
+       - AI专属内容（必读顺序、架构决策）并入 README.md
+       - 删除 PROJECT_CONTEXT.md，根目录精简至3个核心文档
+    3. 文档体系最终状态：
+       - 根目录：CHANGELOG.md, README.md, SESSION_STATE.yaml（3个）
+       - docs/：9个核心文档，全部英文命名
        - archive/docs/：历史归档文档
-       - 全部英文命名，无重复信息
+       - 无重复信息，符合 DOCUMENT_PROTOCOL.md 规范
     
     当前状态：
-    - ✅ 文档体系已精简完毕
-    - ✅ 生产环境安全配置已添加
+    - ✅ 文档膨胀处理完全结束
+    - ✅ 文档体系规范已建立
     - ⚠️ FIX-016待处理：Whisper模型启动加载问题
     - ⏳ Phase 5待开始：历史检索完善
 
@@ -318,6 +309,20 @@ tasks:
         - "✅ Dockerfile HEALTHCHECK指令"
         - "✅ 三级状态: ok/degraded/error"
         - "✅ 返回启动时间、活跃会话数"
+        
+    - id: "DOC-001"
+      desc: "【已完成】文档膨胀处理"
+      status: "completed"
+      done: "2026-02-28"
+      tasks:
+        - "✅ 归档过期文档（SESSION_HANDOFF.md, FRONTEND_MINIMAL.md等）"
+        - "✅ 重命名中文文件（测试清单.md -> TEST_CHECKLIST.md）"
+        - "✅ 归档SKILL.md（内容过时）"
+        - "✅ 合并PROJECT_CONTEXT.md到README.md"
+        - "✅ 根目录精简至3个核心文档"
+        - "✅ 添加Swagger安全开关（DISABLE_SWAGGER）"
+        - "✅ 文档路由精简（只保留/api和/contract）"
+      note: "文档体系符合DOCUMENT_PROTOCOL.md规范"
       
     # ========== 暂缓任务 ==========
     
