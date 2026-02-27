@@ -495,6 +495,13 @@ tasks:
       status: "pending"
       priority: "P0"
       note: "瀚高连接已验证成功，但meetings数据库不存在。需要在瀚高中执行: CREATE DATABASE meetings; 并授权给ai_gwy用户。现有数据库列表见SESSION_HANDOFF.md"
+    
+    - id: "DB-002"
+      desc: "HIGHGO_SCHEMA 支持（现有数据库+Schema部署）"
+      status: "pending"
+      priority: "P1"
+      next_session: "下次会话优先实现"
+      note: "实现方式2：使用现有数据库+Schema隔离数据。需要修改 connection.py 添加schema到连接参数，修改 models.py 表结构指定schema。文档已更新，待代码实现。"
       
     - id: "TODO-008"
       desc: "【P2】Phase 4 AI纪要增强"
